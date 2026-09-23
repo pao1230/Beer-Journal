@@ -88,6 +88,11 @@ app also reads the integration's `POSTGRES_PRISMA_URL` / `POSTGRES_URL` (app) an
 `POSTGRES_URL_NON_POOLING` (migrations), and treats their `sslmode=require` as "encrypted,
 certificate not verified" like `psql` does.
 
+Supabase's direct host (`db.<ref>.supabase.co`) is IPv6-only and unreachable from Vercel. When the
+migration URL points there, migrations use the session pooler instead (the pooled URL's host and
+user on port 5432), so a P1001 "Can't reach database server at db.….supabase.co" no longer
+happens.
+
 Set the Build Command to `prisma migrate deploy && next build` so each deploy applies new
 migrations first (a failed migration fails the deploy and the previous version stays live).
 Set the function region to Singapore (`sin1`) to sit next to the database, and turn off

@@ -28,4 +28,20 @@ describe("migrationDatabaseUrl", () => {
     expect(migrationDatabaseUrl({ DATABASE_URL: "a" })).toBe("a");
     expect(migrationDatabaseUrl({})).toBeUndefined();
   });
+  it("swaps Supabase's IPv6-only direct host for the session pooler", () => {
+    const pooled = "postgres://postgres.abc123:p%40ss@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres?sslmode=require&pgbouncer=true";
+    const session = "postgres://postgres.abc123:p%40ss@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres?sslmode=require";
+    const direct = "postgres://postgres:p%40ss@db.abc123.supabase.co:5432/postgres?sslmode=require";
+    expect(migrationDatabaseUrl({ POSTGRES_URL_NON_POOLING: direct, POSTGRES_PRISMA_URL: pooled })).toBe(session);
+    expect(migrationDatabaseUrl({ DIRECT_URL: direct, DATABASE_URL: pooled })).toBe(session);
+  });
+  it("keeps the direct host when no pooler URL for the same project is set", () => {
+    const direct = "postgres://postgres:pw@db.abc123.supabase.co:5432/postgres";
+    expect(migrationDatabaseUrl({ DIRECT_URL: direct })).toBe(direct);
+    expect(migrationDatabaseUrl({ DIRECT_URL: direct, DATABASE_URL: "postgres://postgres.other:pw@aws-0-x.pooler.supabase.com:6543/postgres" })).toBe(direct);
+  });
+  it("leaves a session pooler DIRECT_URL alone", () => {
+    const session = "postgres://postgres.abc123:pw@aws-0-x.pooler.supabase.com:5432/postgres";
+    expect(migrationDatabaseUrl({ DIRECT_URL: session, DATABASE_URL: "postgres://postgres.abc123:pw@aws-0-x.pooler.supabase.com:6543/postgres" })).toBe(session);
+  });
 });

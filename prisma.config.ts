@@ -8,7 +8,7 @@ export default defineConfig({
     path: "prisma/migrations",
     seed: "tsx prisma/seed.ts",
   },
-  // On Supabase, DIRECT_URL (or the integration's POSTGRES_URL_NON_POOLING) is the session pooler, port 5432.
+  // On Supabase this is the session pooler (port 5432); the IPv6-only direct host is swapped for it.
   datasource: {
     url: migrationDatabaseUrl(),
   },
