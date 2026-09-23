@@ -3,8 +3,8 @@
 import { useMemo, useState } from "react";
 import { Trash2, ArrowUp, ArrowDown } from "lucide-react";
 import { ActionForm } from "@/components/action-form";
-import { Button, ButtonLink, Card, CardTitle, Field, Input, Select, Textarea } from "@/components/ui";
-import { abv, DEFAULT_STAGE, fmtAbv, INGREDIENT_TYPES, STAGES, UNITS } from "@/lib/brewing";
+import { Badge, Button, ButtonLink, Card, CardTitle, Field, Input, Select, Textarea } from "@/components/ui";
+import { abv, DEFAULT_STAGE, DEFAULT_UNIT, fmtAbv, INGREDIENT_TYPES, STAGES, UNITS } from "@/lib/brewing";
 import { calcRecipe } from "@/lib/calc";
 import { CalcTable } from "@/components/calc-card";
 import type { ActionState } from "@/lib/form";
@@ -24,9 +24,11 @@ export type PickerIngredient = {
   unfermentable: boolean;
 };
 
+/** A row points at an existing ingredient, or carries a name to create when the recipe is saved. */
 export type IngredientRow = {
   key: string;
-  ingredientId: number;
+  ingredientId: number | null;
+  newIngredient?: { name: string; type: IngredientType };
   amount: string;
   unit: string;
   stage: AdditionStage;
@@ -56,16 +58,10 @@ export type RecipeInitial = {
   mashSteps: MashRow[];
 };
 
-const DEFAULT_UNIT: Record<IngredientType, string> = {
-  GRAIN: "kg",
-  HOP: "g",
-  YEAST: "pkg",
-  WATER: "g",
-  OTHER: "g",
-};
-
 let keySeq = 0;
 const newKey = () => `new-${++keySeq}`;
+
+const NO_SPECS = { brand: null, isArchived: false, potential: null, waterSalt: null, alphaAcid: null, color: null, attenuation: null, unfermentable: false };
 
 const toNum = (s: string) => (s.trim() === "" ? null : Number(s));
 const v = (n: number | null | undefined) => (n == null ? "" : String(n));
@@ -96,11 +92,18 @@ export function RecipeEditor({
   const [mashWater, setMashWater] = useState(v(initial.mashWaterL));
   const [spargeWater, setSpargeWater] = useState(v(initial.spargeWaterL));
   const [pickType, setPickType] = useState<IngredientType>("GRAIN");
-  const [pickId, setPickId] = useState("");
+  const [pickName, setPickName] = useState("");
   const [pickAmount, setPickAmount] = useState("");
+  const [pickUnit, setPickUnit] = useState(DEFAULT_UNIT.GRAIN);
 
   const byId = useMemo(() => new Map(ingredients.map((i) => [i.id, i])), [ingredients]);
   const pickable = ingredients.filter((i) => i.type === pickType && !i.isArchived);
+  const optionLabel = (i: PickerIngredient) => (i.brand ? `${i.name} (${i.brand})` : i.name);
+  const typedName = pickName.trim();
+  const typed = typedName.toLowerCase();
+  const pickMatch =
+    pickable.find((i) => optionLabel(i).toLowerCase() === typed) ?? pickable.find((i) => i.name.toLowerCase() === typed);
+  const typeLabel = INGREDIENT_TYPES.find((t) => t.value === pickType)?.label ?? pickType;
   const targetAbv = abv(toNum(og), toNum(fg));
   const selectedEquipment = equipment.find((e) => String(e.id) === equipmentId) ?? null;
   const calc = calcRecipe({
@@ -111,28 +114,30 @@ export function RecipeEditor({
     mashWaterL: toNum(mashWater),
     spargeWaterL: toNum(spargeWater),
     ingredients: rows.flatMap((r) => {
-      const ing = byId.get(r.ingredientId);
+      const ing = r.ingredientId != null ? byId.get(r.ingredientId) : undefined;
+      const specs = ing ?? (r.newIngredient && { ...NO_SPECS, ...r.newIngredient });
       const amount = toNum(r.amount);
-      if (!ing || amount == null) return [];
-      return [{ ...ing, amount, unit: r.unit, stage: r.stage, additionTime: toNum(r.additionTime) }];
+      if (!specs || amount == null) return [];
+      return [{ ...specs, amount, unit: r.unit, stage: r.stage, additionTime: toNum(r.additionTime) }];
     }),
   });
 
   function addRow() {
-    const id = Number(pickId || pickable[0]?.id);
-    if (!id) return;
+    if (!typedName) return;
     setRows((r) => [
       ...r,
       {
         key: newKey(),
-        ingredientId: id,
+        ingredientId: pickMatch?.id ?? null,
+        newIngredient: pickMatch ? undefined : { name: typedName, type: pickType },
         amount: pickAmount,
-        unit: DEFAULT_UNIT[pickType],
+        unit: pickUnit,
         stage: DEFAULT_STAGE[pickType],
         additionTime: pickType === "HOP" ? "60" : "",
         notes: "",
       },
     ]);
+    setPickName("");
     setPickAmount("");
   }
 
@@ -150,6 +155,7 @@ export function RecipeEditor({
   const serializedRows = JSON.stringify(
     rows.map((r) => ({
       ingredientId: r.ingredientId,
+      newIngredient: r.newIngredient ?? null,
       amount: toNum(r.amount) ?? 0,
       unit: r.unit,
       stage: r.stage,
@@ -226,13 +232,15 @@ export function RecipeEditor({
 
       <Card>
         <CardTitle>Ingredients</CardTitle>
-        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-[8rem_1fr_7rem_auto]">
+        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-[8rem_1fr_6rem_5rem_auto]">
           <Select
             aria-label="Type"
             value={pickType}
             onChange={(e) => {
-              setPickType(e.target.value as IngredientType);
-              setPickId("");
+              const t = e.target.value as IngredientType;
+              setPickType(t);
+              setPickUnit(DEFAULT_UNIT[t]);
+              setPickName("");
             }}
           >
             {INGREDIENT_TYPES.map((t) => (
@@ -241,21 +249,31 @@ export function RecipeEditor({
               </option>
             ))}
           </Select>
-          <Select aria-label="Ingredient" value={pickId} onChange={(e) => setPickId(e.target.value)}>
-            {pickable.length === 0 && <option value="">No {pickType.toLowerCase()} ingredients yet</option>}
+          <Input
+            aria-label="Ingredient"
+            list="ingredient-options"
+            autoComplete="off"
+            placeholder={pickable.length ? `Pick or type a ${typeLabel.toLowerCase()}` : `Type a new ${typeLabel.toLowerCase()} name`}
+            value={pickName}
+            onChange={(e) => setPickName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                addRow();
+              }
+            }}
+          />
+          <datalist id="ingredient-options">
             {pickable.map((i) => (
-              <option key={i.id} value={i.id}>
-                {i.name}
-                {i.brand ? ` (${i.brand})` : ""}
-              </option>
+              <option key={i.id} value={optionLabel(i)} />
             ))}
-          </Select>
+          </datalist>
           <Input
             aria-label="Amount"
             type="number"
             step="any"
             min="0"
-            placeholder={`Amount (${DEFAULT_UNIT[pickType]})`}
+            placeholder="Amount"
             value={pickAmount}
             onChange={(e) => setPickAmount(e.target.value)}
             onKeyDown={(e) => {
@@ -265,12 +283,26 @@ export function RecipeEditor({
               }
             }}
           />
-          <Button type="button" variant="secondary" onClick={addRow} disabled={pickable.length === 0}>
+          <Select aria-label="Add unit" value={pickUnit} onChange={(e) => setPickUnit(e.target.value)}>
+            {UNITS.map((u) => (
+              <option key={u}>{u}</option>
+            ))}
+          </Select>
+          <Button type="button" variant="secondary" onClick={addRow} disabled={!typedName} className="col-span-2 sm:col-span-1">
             Add
           </Button>
         </div>
-        <p className="-mt-2 mb-3 text-xs text-muted-foreground">
-          Missing something? <a className="underline" href={`/ingredients/new?type=${pickType}`} target="_blank">Create an ingredient</a> in a new tab, then reload this page.
+        <p className="-mt-2 mb-3 text-xs text-muted-foreground" aria-live="polite">
+          {typedName && !pickMatch ? (
+            <>
+              <strong className="text-foreground">&ldquo;{typedName}&rdquo;</strong> will be created as a new {typeLabel.toLowerCase()}{" "}
+              when you save. Add its specs (color, alpha acid…) later on the Ingredients page for calculations.
+            </>
+          ) : pickable.length ? (
+            "Pick from your ingredients, or type a new name to create one."
+          ) : (
+            `No ${typeLabel.toLowerCase()} ingredients yet — type a name to create one.`
+          )}
         </p>
 
         {rows.length === 0 ? (
@@ -278,13 +310,17 @@ export function RecipeEditor({
         ) : (
           <ul className="divide-y divide-border">
             {rows.map((row, idx) => {
-              const ing = byId.get(row.ingredientId);
+              const ing = row.ingredientId != null ? byId.get(row.ingredientId) : undefined;
+              const rowType = ing?.type ?? row.newIngredient?.type;
               return (
                 <li key={row.key} className="grid grid-cols-2 gap-2 py-3 sm:grid-cols-[1fr_6rem_5rem_8rem_5rem_auto] sm:items-center">
                   <div className="col-span-2 sm:col-span-1">
-                    <div className="font-medium">{ing?.name ?? "Unknown ingredient"}</div>
+                    <div className="font-medium">
+                      {ing?.name ?? row.newIngredient?.name ?? "Unknown ingredient"}
+                      {row.newIngredient && <Badge className="ml-2 align-middle">new</Badge>}
+                    </div>
                     <div className="text-xs text-muted-foreground">
-                      {ing && INGREDIENT_TYPES.find((t) => t.value === ing.type)?.label}
+                      {rowType && INGREDIENT_TYPES.find((t) => t.value === rowType)?.label}
                       {ing?.brand ? ` · ${ing.brand}` : ""}
                       {ing?.isArchived ? " · archived" : ""}
                     </div>

@@ -3,19 +3,11 @@
 import { useState } from "react";
 import { ActionForm } from "@/components/action-form";
 import { Button, ButtonLink, Field, Input, Select, Textarea } from "@/components/ui";
-import { INGREDIENT_TYPES, UNITS } from "@/lib/brewing";
+import { DEFAULT_UNIT, INGREDIENT_TYPES, UNITS } from "@/lib/brewing";
 import { WATER_SALTS } from "@/lib/calc";
 import type { ActionState } from "@/lib/form";
 import type { Ingredient } from "@/generated/prisma/client";
 import type { IngredientType } from "@/generated/prisma/enums";
-
-const DEFAULT_STOCK_UNIT: Record<IngredientType, string> = {
-  GRAIN: "kg",
-  HOP: "g",
-  YEAST: "pkg",
-  WATER: "g",
-  OTHER: "g",
-};
 
 export function IngredientForm({
   action,
@@ -118,7 +110,7 @@ export function IngredientForm({
         </Field>
       )}
       <Field label="Inventory unit" hint="Stock and cost are tracked in this unit">
-        <Select name="stockUnit" defaultValue={i?.stockUnit ?? DEFAULT_STOCK_UNIT[type]} key={type}>
+        <Select name="stockUnit" defaultValue={i?.stockUnit ?? DEFAULT_UNIT[type]} key={type}>
           <option value="">– don&apos;t track stock –</option>
           {UNITS.map((u) => (
             <option key={u}>{u}</option>

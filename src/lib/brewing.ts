@@ -33,6 +33,14 @@ export const DEFAULT_STAGE: Record<IngredientType, AdditionStage> = {
 
 export const UNITS = ["kg", "g", "L", "ml", "pkg", "tsp", "item"];
 
+export const DEFAULT_UNIT: Record<IngredientType, string> = {
+  GRAIN: "kg",
+  HOP: "g",
+  YEAST: "pkg",
+  WATER: "g",
+  OTHER: "g",
+};
+
 export const STATUSES: { value: BrewStatus; label: string }[] = [
   { value: "PLANNING", label: "Planning" },
   { value: "BREWING", label: "Brewing" },
