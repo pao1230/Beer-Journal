@@ -1,0 +1,279 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum IngredientType {
+  GRAIN
+  HOP
+  YEAST
+  WATER
+  OTHER
+}
+
+enum AdditionStage {
+  MASH
+  SPARGE
+  BOIL
+  WHIRLPOOL
+  FERMENTATION
+  DRY_HOP
+  PACKAGING
+}
+
+enum BrewStatus {
+  PLANNING
+  BREWING
+  FERMENTING
+  CONDITIONING
+  COMPLETED
+  CANCELLED
+}
+
+enum StepType {
+  WATER_PREP
+  MASHING
+  SPARGING
+  BOILING
+  COOLING
+  FERMENTATION
+  PACKAGING
+}
+
+model Ingredient {
+  id           Int            @id @default(autoincrement())
+  name         String
+  type         IngredientType
+  brand        String?
+  supplier     String?
+  notes        String?
+  isArchived   Boolean        @default(false)
+  // Grain
+  color        Float? // °Lovibond
+  potential    Float? // specific gravity per kg/L, e.g. 1.037
+  // Hop / Yeast
+  alphaAcid    Float? // %
+  form         String? // hop: pellet/leaf/cryo · yeast: dry/liquid
+  attenuation  Float? // %
+  flocculation String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  recipeIngredients RecipeIngredient[]
+  brewIngredients   BrewIngredient[]
+
+  @@index([type, isArchived])
+}
+
+model EquipmentProfile {
+  id               Int      @id @default(autoincrement())
+  name             String
+  batchSize        Float // L
+  boilOffRate      Float // L/hr
+  mashTunDeadspace Float    @default(0) // L
+  trubLoss         Float    @default(0) // L
+  efficiency       Float // %
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  recipeVersions RecipeVersion[]
+}
+
+model Recipe {
+  id        Int      @id @default(autoincrement())
+  name      String
+  style     String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  versions RecipeVersion[]
+  sessions BrewSession[]
+}
+
+/// Everything that can change between versions lives here so old brews keep their original targets.
+model RecipeVersion {
+  id                 Int               @id @default(autoincrement())
+  recipeId           Int
+  recipe             Recipe            @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  version            Int
+  notes              String?
+  createdAt          DateTime          @default(now())
+  equipmentProfileId Int?
+  equipmentProfile   EquipmentProfile? @relation(fields: [equipmentProfileId], references: [id], onDelete: SetNull)
+  batchSize          Float // L
+  boilTime           Int               @default(60) // min
+  targetOg           Float?
+  targetFg           Float?
+  targetIbu          Float?
+  targetSrm          Float?
+  targetCarbonation  Float? // vol CO2
+  waterSource        String?
+  mashWaterL         Float?
+  spargeWaterL       Float?
+  targetMashPh       Float?
+
+  ingredients RecipeIngredient[]
+  mashSteps   MashStep[]
+  sessions    BrewSession[]
+
+  @@unique([recipeId, version])
+}
+
+model RecipeIngredient {
+  id                  Int           @id @default(autoincrement())
+  recipeVersionId     Int
+  recipeVersion       RecipeVersion @relation(fields: [recipeVersionId], references: [id], onDelete: Cascade)
+  ingredientId        Int
+  ingredient          Ingredient    @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+  // Frozen when added, so editing the ingredient later doesn't rewrite this recipe.
+  nameSnapshot        String
+  brandSnapshot       String?
+  alphaAcidSnapshot   Float?
+  colorSnapshot       Float?
+  attenuationSnapshot Float?
+  amount              Float
+  unit                String
+  stage               AdditionStage
+  additionTime        Int? // minutes (boil: time remaining; dry hop: day)
+  notes               String?
+  sortOrder           Int           @default(0)
+
+  @@index([recipeVersionId])
+}
+
+model MashStep {
+  id              Int           @id @default(autoincrement())
+  recipeVersionId Int
+  recipeVersion   RecipeVersion @relation(fields: [recipeVersionId], references: [id], onDelete: Cascade)
+  stepOrder       Int
+  name            String
+  temperature     Float // °C
+  timeMin         Int
+
+  @@index([recipeVersionId])
+}
+
+model BrewSession {
+  id                  Int           @id @default(autoincrement())
+  recipeId            Int
+  recipe              Recipe        @relation(fields: [recipeId], references: [id], onDelete: Restrict)
+  recipeVersionId     Int
+  recipeVersion       RecipeVersion @relation(fields: [recipeVersionId], references: [id], onDelete: Restrict)
+  clonedFromSessionId Int?
+  clonedFrom          BrewSession?  @relation("Clones", fields: [clonedFromSessionId], references: [id], onDelete: SetNull)
+  clones              BrewSession[] @relation("Clones")
+  batchNumber         Int
+  brewDate            DateTime
+  status              BrewStatus    @default(PLANNING)
+  actualVolume        Float? // L into fermenter
+  actualOg            Float?
+  actualFg            Float?
+  packagingMethod     String?
+  notes               String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  ingredients BrewIngredient[]
+  steps       BrewStep[]
+  problems    Problem[]
+  lessons     Lesson[]
+
+  @@unique([recipeId, batchNumber])
+  @@index([brewDate])
+}
+
+model BrewIngredient {
+  id                 Int           @id @default(autoincrement())
+  brewSessionId      Int
+  brewSession        BrewSession   @relation(fields: [brewSessionId], references: [id], onDelete: Cascade)
+  ingredientId       Int?
+  ingredient         Ingredient?   @relation(fields: [ingredientId], references: [id], onDelete: SetNull)
+  nameSnapshot       String
+  plannedAmount      Float?
+  actualAmount       Float?
+  unit               String
+  stage              AdditionStage
+  additionTime       Int?
+  substitutedForName String?
+  notes              String?
+  sortOrder          Int           @default(0)
+
+  @@index([brewSessionId])
+}
+
+model BrewStep {
+  id            Int         @id @default(autoincrement())
+  brewSessionId Int
+  brewSession   BrewSession @relation(fields: [brewSessionId], references: [id], onDelete: Cascade)
+  type          StepType
+  completedAt   DateTime?
+  notes         String?
+
+  measurements    Measurement[]
+  problems        Problem[]
+  fermentationLog FermentationLog[]
+
+  @@unique([brewSessionId, type])
+}
+
+model Measurement {
+  id         Int      @id @default(autoincrement())
+  brewStepId Int
+  brewStep   BrewStep @relation(fields: [brewStepId], references: [id], onDelete: Cascade)
+  type       String
+  value      Float
+  unit       String?
+  recordedAt DateTime @default(now())
+  notes      String?
+
+  @@index([brewStepId])
+}
+
+/// Always belongs to a session; the step is optional for problems not tied to one step.
+model Problem {
+  id            Int         @id @default(autoincrement())
+  brewSessionId Int
+  brewSession   BrewSession @relation(fields: [brewSessionId], references: [id], onDelete: Cascade)
+  brewStepId    Int?
+  brewStep      BrewStep?   @relation(fields: [brewStepId], references: [id], onDelete: SetNull)
+  title         String
+  description   String?
+  cause         String?
+  action        String?
+  impact        String?
+  createdAt     DateTime    @default(now())
+
+  lessons Lesson[]
+
+  @@index([brewSessionId])
+}
+
+model Lesson {
+  id            Int          @id @default(autoincrement())
+  text          String
+  tags          String[]
+  problemId     Int?
+  problem       Problem?     @relation(fields: [problemId], references: [id], onDelete: SetNull)
+  brewSessionId Int?
+  brewSession   BrewSession? @relation(fields: [brewSessionId], references: [id], onDelete: SetNull)
+  createdAt     DateTime     @default(now())
+}
+
+model FermentationLog {
+  id          Int      @id @default(autoincrement())
+  brewStepId  Int
+  brewStep    BrewStep @relation(fields: [brewStepId], references: [id], onDelete: Cascade)
+  date        DateTime
+  temperature Float?
+  gravity     Float?
+  ph          Float?
+  activity    String?
+  notes       String?
+
+  @@index([brewStepId])
+}

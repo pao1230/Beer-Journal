@@ -1,5 +1,16 @@
 # 🍺 Brewing Journal Web App — Plan (v2)
 
+> **Status:** Phase 1 is implemented (see [README](README.md)). Some Phase 2 items came for free
+> and are also done: fermentation daily log, recipe versioning, deviation warnings with
+> "Log as problem", and lessons/problems search. Still to do from Phase 2: charts, compare brews,
+> recipe scaling, and proper full-text search.
+>
+> Small deviations from §25 made during implementation:
+> - `problems.brew_session_id` is always set (the step is optional), which makes per-brew queries simpler.
+> - ABV is calculated from OG/FG instead of stored, so it can't drift out of sync.
+> - Water `source` lives on `recipe_versions`; the "Water" ingredient type is for salts/agents.
+> - `brew_ingredients` stores `substituted_for_name` (text) rather than an id, so it survives ingredient edits.
+
 > Revised from the original plan. Changes from v1 are marked **[NEW]** or **[FIX]** inline. See
 > [§0 Summary of Changes](#0-summary-of-changes-from-v1) for a full diff-style list.
 
