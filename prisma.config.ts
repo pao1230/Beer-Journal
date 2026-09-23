@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
+import { migrationDatabaseUrl } from "./src/lib/db-url";
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
@@ -7,8 +8,8 @@ export default defineConfig({
     path: "prisma/migrations",
     seed: "tsx prisma/seed.ts",
   },
-  // Migrations need a session connection; on Supabase set DIRECT_URL to the session pooler (port 5432).
+  // On Supabase, DIRECT_URL (or the integration's POSTGRES_URL_NON_POOLING) is the session pooler, port 5432.
   datasource: {
-    url: process.env["DIRECT_URL"] || process.env["DATABASE_URL"],
+    url: migrationDatabaseUrl(),
   },
 });

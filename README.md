@@ -80,6 +80,11 @@ Vercel + Supabase:
 | `DIRECT_URL` | Supabase session pooler URL (port 5432) — used by migrations |
 | `BASIC_AUTH_USER` / `BASIC_AUTH_PASSWORD` | your login |
 
+If you connect Supabase through Vercel's Supabase integration instead, nothing needs copying: the
+app also reads the integration's `POSTGRES_PRISMA_URL` / `POSTGRES_URL` (app) and
+`POSTGRES_URL_NON_POOLING` (migrations), and treats their `sslmode=require` as "encrypted,
+certificate not verified" like `psql` does.
+
 Set the Build Command to `prisma migrate deploy && next build` so each deploy applies new
 migrations first (a failed migration fails the deploy and the previous version stays live).
 Set the function region to Singapore (`sin1`) to sit next to the database, and turn off
