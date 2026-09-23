@@ -23,11 +23,11 @@ describe("abv", () => {
 
 describe("validateGravity", () => {
   it("rejects FG at or above OG", () => {
-    expect(validateGravity(1.026, 1.072)).toMatch(/FG must be lower/);
-    expect(validateGravity(1.05, 1.05)).toMatch(/FG must be lower/);
+    expect(validateGravity(1.026, 1.072)?.message).toMatch(/FG must be lower/);
+    expect(validateGravity(1.05, 1.05)?.message).toMatch(/FG must be lower/);
   });
   it("rejects values that look like points instead of SG", () => {
-    expect(validateGravity(72, null)).toMatch(/looks wrong/);
+    expect(validateGravity(72, null)?.message).toMatch(/looks wrong/);
   });
   it("accepts a normal pair or partial data", () => {
     expect(validateGravity(1.072, 1.026)).toBeNull();

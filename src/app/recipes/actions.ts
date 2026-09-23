@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { run } from "@/lib/action";
+import { UserError } from "@/lib/user-error";
 import { int, num, required, str, type ActionState } from "@/lib/form";
 import { DEFAULT_UNIT, roundAmount, scaleWater, UNITS, validateGravity } from "@/lib/brewing";
 import type { Prisma } from "@/generated/prisma/client";
@@ -45,8 +46,8 @@ function parseJson<T>(schema: z.ZodType<T>, raw: string | null): T {
 function parseVersion(fd: FormData) {
   const targetOg = num(fd, "targetOg");
   const targetFg = num(fd, "targetFg");
-  const gravityError = validateGravity(targetOg, targetFg);
-  if (gravityError) throw new Error(`Target ${gravityError}`);
+  const gravityError = validateGravity(targetOg, targetFg, ["Target OG", "Target FG"]);
+  if (gravityError) throw gravityError;
   return {
     notes: str(fd, "versionNotes"),
     equipmentProfileId: int(fd, "equipmentProfileId"),
@@ -82,7 +83,7 @@ async function versionChildren(fd: FormData) {
   const created = new Map<string, number>();
   const rows = [];
   for (const r of parsed) {
-    if (!UNITS.includes(r.unit)) throw new Error(`Unknown unit "${r.unit}"`);
+    if (!UNITS.includes(r.unit)) throw new UserError("Unknown unit “{unit}”", { unit: r.unit });
     let ingredientId = r.ingredientId;
     if (ingredientId == null && r.newIngredient) {
       const key = `${r.newIngredient.type}|${r.newIngredient.name.toLowerCase()}`;
@@ -196,7 +197,7 @@ export async function updateRecipe(recipeId: number, _: ActionState, fd: FormDat
 export async function deleteRecipe(recipeId: number, _: ActionState) {
   return run(async () => {
     const brews = await db.brewSession.count({ where: { recipeId } });
-    if (brews > 0) throw new Error(`This recipe has ${brews} brew(s) — delete those first.`);
+    if (brews > 0) throw new UserError("This recipe has {n} brew(s) — delete those first.", { n: brews });
     await db.recipe.delete({ where: { id: recipeId } });
     revalidatePath("/recipes");
     redirect("/recipes");

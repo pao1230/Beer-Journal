@@ -4,10 +4,15 @@ import { db } from "@/lib/db";
 import { fmtNum, INGREDIENT_TYPES, labelOf } from "@/lib/brewing";
 import { fmtMoney } from "@/lib/inventory";
 import { loadStock } from "@/lib/inventory-data";
+import { getI18n } from "@/lib/i18n/server";
 
-export const metadata = { title: "Inventory" };
+export async function generateMetadata() {
+  const { t } = await getI18n();
+  return { title: t("Inventory") };
+}
 
 export default async function InventoryPage() {
+  const { t } = await getI18n();
   const [ingredients, stock] = await Promise.all([
     db.ingredient.findMany({
       where: { stockUnit: { not: null } },
@@ -24,23 +29,23 @@ export default async function InventoryPage() {
   return (
     <>
       <PageHeader
-        title="Inventory"
-        subtitle={`Stock on hand, valued at average purchase cost: ${fmtMoney(totalValue)}`}
-        actions={<ButtonLink href="/ingredients" variant="secondary">Ingredients</ButtonLink>}
+        title={t("Inventory")}
+        subtitle={t("Stock on hand, valued at average purchase cost: {v}", { v: fmtMoney(totalValue) })}
+        actions={<ButtonLink href="/ingredients" variant="secondary">{t("Ingredients")}</ButtonLink>}
       />
       <Card>
         {rows.length === 0 ? (
-          <Empty>No ingredients are tracked yet. Set an inventory unit on an ingredient, then add a purchase.</Empty>
+          <Empty>{t("No ingredients are tracked yet. Set an inventory unit on an ingredient, then add a purchase.")}</Empty>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[28rem] text-sm tabular-nums">
               <thead className="text-left text-xs text-muted-foreground">
                 <tr>
-                  <th className="py-1 pr-3 font-medium">Ingredient</th>
-                  <th className="py-1 pr-3 font-medium">Type</th>
-                  <th className="py-1 pr-3 text-right font-medium">In stock</th>
-                  <th className="py-1 pr-3 text-right font-medium">Avg cost</th>
-                  <th className="py-1 text-right font-medium">Value</th>
+                  <th className="py-1 pr-3 font-medium">{t("Ingredient")}</th>
+                  <th className="py-1 pr-3 font-medium">{t("Type")}</th>
+                  <th className="py-1 pr-3 text-right font-medium">{t("In stock")}</th>
+                  <th className="py-1 pr-3 text-right font-medium">{t("Avg cost")}</th>
+                  <th className="py-1 text-right font-medium">{t("Value")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -52,9 +57,9 @@ export default async function InventoryPage() {
                       </Link>
                       {r.brand && <span className="ml-2 text-xs text-muted-foreground">{r.brand}</span>}
                     </td>
-                    <td className="py-2 pr-3 text-muted-foreground">{labelOf(INGREDIENT_TYPES, r.type)}</td>
+                    <td className="py-2 pr-3 text-muted-foreground">{t(labelOf(INGREDIENT_TYPES, r.type))}</td>
                     <td className="py-2 pr-3 text-right">
-                      {r.stock.onHand <= 0 && <Badge className="mr-2 bg-warning-bg">⚠️ Out</Badge>}
+                      {r.stock.onHand <= 0 && <Badge className="mr-2 bg-warning-bg">⚠️ {t("Out")}</Badge>}
                       {fmtNum(Number(r.stock.onHand.toFixed(3)), r.stock.stockUnit!)}
                     </td>
                     <td className="py-2 pr-3 text-right">

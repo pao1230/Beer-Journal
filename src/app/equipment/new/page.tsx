@@ -1,13 +1,18 @@
 import { Card, PageHeader } from "@/components/ui";
+import { getI18n } from "@/lib/i18n/server";
 import { createEquipment } from "../actions";
 import { EquipmentForm } from "../equipment-form";
 
-export const metadata = { title: "New equipment profile" };
+export async function generateMetadata() {
+  const { t } = await getI18n();
+  return { title: t("New equipment profile") };
+}
 
-export default function NewEquipmentPage() {
+export default async function NewEquipmentPage() {
+  const { t } = await getI18n();
   return (
     <>
-      <PageHeader title="New equipment profile" />
+      <PageHeader title={t("New equipment profile")} />
       <Card>
         <EquipmentForm action={createEquipment} />
       </Card>

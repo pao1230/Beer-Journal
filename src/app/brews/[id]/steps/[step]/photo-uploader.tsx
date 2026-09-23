@@ -4,6 +4,7 @@ import { startTransition, useActionState, useRef, useState } from "react";
 import { Camera } from "lucide-react";
 import { Input } from "@/components/ui";
 import type { ActionState } from "@/lib/form";
+import { useI18n } from "@/lib/i18n/client";
 
 const MAX_EDGE = 1600;
 
@@ -23,6 +24,7 @@ async function resize(file: File) {
 }
 
 export function PhotoUploader({ action }: { action: (prev: ActionState, fd: FormData) => Promise<ActionState> }) {
+  const { t } = useI18n();
   const [state, formAction, pending] = useActionState(action, {});
   const [message, setMessage] = useState<string | null>(null);
   const captionRef = useRef<HTMLInputElement>(null);
@@ -41,7 +43,7 @@ export function PhotoUploader({ action }: { action: (prev: ActionState, fd: Form
         fd.set("caption", captionRef.current?.value ?? "");
         startTransition(() => formAction(fd));
       } catch {
-        setMessage(`${file.name}: this image format isn't supported by your browser`);
+        setMessage(t("{name}: this image format isn't supported by your browser", { name: file.name }));
       }
     }
     if (fileRef.current) fileRef.current.value = "";
@@ -50,10 +52,10 @@ export function PhotoUploader({ action }: { action: (prev: ActionState, fd: Form
 
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-      <Input ref={captionRef} placeholder="Caption (optional)" aria-label="Photo caption" className="sm:max-w-xs" />
+      <Input ref={captionRef} placeholder={t("Caption (optional)")} aria-label={t("Photo caption")} className="sm:max-w-xs" />
       <label className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-border bg-card px-3 text-sm font-medium hover:bg-muted">
         <Camera className="size-4" />
-        {pending ? "Uploading…" : "Add photos"}
+        {pending ? t("Uploading…") : t("Add photos")}
         <input
           ref={fileRef}
           type="file"
@@ -66,7 +68,7 @@ export function PhotoUploader({ action }: { action: (prev: ActionState, fd: Form
       </label>
       {(message ?? state.error) && (
         <p role="alert" className="text-sm text-danger">
-          {message ?? state.error}
+          {message ?? (state.error && t(state.error))}
         </p>
       )}
     </div>

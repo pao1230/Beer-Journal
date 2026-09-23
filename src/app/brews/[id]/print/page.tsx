@@ -9,7 +9,6 @@ import {
   daysSince,
   fermentationSeries,
   fmtAbv,
-  fmtDate,
   fmtNum,
   fmtSg,
   labelOf,
@@ -17,8 +16,12 @@ import {
   STEPS,
 } from "@/lib/brewing";
 import { PrintButton } from "./print-button";
+import { getI18n } from "@/lib/i18n/server";
 
-export const metadata = { title: "Brew report" };
+export async function generateMetadata() {
+  const { t } = await getI18n();
+  return { title: t("Brew report") };
+}
 
 function H2({ children }: { children: React.ReactNode }) {
   return <h2 className="mt-6 mb-2 border-b border-border pb-1 text-lg font-semibold">{children}</h2>;
@@ -26,6 +29,7 @@ function H2({ children }: { children: React.ReactNode }) {
 
 export default async function PrintPage(props: PageProps<"/brews/[id]/print">) {
   const id = Number((await props.params).id);
+  const { t, date } = await getI18n();
   const b = Number.isInteger(id)
     ? await db.brewSession.findUnique({
         where: { id },
@@ -56,23 +60,24 @@ export default async function PrintPage(props: PageProps<"/brews/[id]/print">) {
     <article className="mx-auto max-w-3xl text-sm">
       <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-2">
         <Link href={`/brews/${b.id}`} className="underline">
-          ← Back to brew
+          {t("← Back to brew")}
         </Link>
         <PrintButton />
       </div>
 
       <h1 className="text-2xl font-bold">{title}</h1>
       <p className="text-muted-foreground">
-        {b.recipe.style && `${b.recipe.style} · `}Recipe v{v.version} · Brewed {fmtDate(b.brewDate)} · {labelOf(STATUSES, b.status)}
-        {b.packagingMethod && ` · ${b.packagingMethod}`}
+        {b.recipe.style && `${b.recipe.style} · `}
+        {t("Recipe v{n}", { n: v.version })} · {t("Brewed {date}", { date: date(b.brewDate) })} · {t(labelOf(STATUSES, b.status))}
+        {b.packagingMethod && ` · ${t(b.packagingMethod)}`}
       </p>
 
-      <H2>Target vs actual</H2>
+      <H2>{t("Target vs actual")}</H2>
       <table className="w-full tabular-nums">
         <thead className="text-left text-xs text-muted-foreground">
           <tr>
             <th className="font-medium" />
-            <th className="font-medium">Volume</th>
+            <th className="font-medium">{t("Volume")}</th>
             <th className="font-medium">OG</th>
             <th className="font-medium">FG</th>
             <th className="font-medium">ABV</th>
@@ -80,14 +85,14 @@ export default async function PrintPage(props: PageProps<"/brews/[id]/print">) {
         </thead>
         <tbody>
           <tr>
-            <td className="text-muted-foreground">Target</td>
+            <td className="text-muted-foreground">{t("Target")}</td>
             <td>{fmtNum(v.batchSize, "L")}</td>
             <td>{fmtSg(v.targetOg)}</td>
             <td>{fmtSg(v.targetFg)}</td>
             <td>{fmtAbv(abv(v.targetOg, v.targetFg))}</td>
           </tr>
           <tr className="font-semibold">
-            <td>Actual</td>
+            <td>{t("Actual")}</td>
             <td>{fmtNum(b.actualVolume, "L")}</td>
             <td>{fmtSg(b.actualOg)}</td>
             <td>{fmtSg(b.actualFg)}</td>
@@ -97,12 +102,12 @@ export default async function PrintPage(props: PageProps<"/brews/[id]/print">) {
       </table>
       {b.notes && <p className="mt-2 whitespace-pre-wrap">{b.notes}</p>}
 
-      <H2>Ingredients</H2>
+      <H2>{t("Ingredients")}</H2>
       <IngredientTable
         rows={b.ingredients.map((i) => ({
           id: i.id,
           name: i.nameSnapshot,
-          detail: i.substitutedForName ? `swapped for ${i.substitutedForName}` : null,
+          detail: i.substitutedForName ? t("swapped for {name}", { name: i.substitutedForName }) : null,
           stage: i.stage,
           additionTime: i.additionTime,
           amount: fmtNum(i.actualAmount ?? i.plannedAmount, i.unit),
@@ -110,7 +115,7 @@ export default async function PrintPage(props: PageProps<"/brews/[id]/print">) {
       />
       {v.mashSteps.length > 0 && (
         <p className="mt-2 text-muted-foreground">
-          Mash: {v.mashSteps.map((m) => `${m.name} ${m.temperature}°C/${m.timeMin} min`).join(" → ")}
+          {t("Mash:")} {v.mashSteps.map((m) => `${m.name} ${m.temperature}°C/${m.timeMin} min`).join(" → ")}
         </p>
       )}
 
@@ -122,13 +127,13 @@ export default async function PrintPage(props: PageProps<"/brews/[id]/print">) {
         return (
           <section key={def.type}>
             <H2>
-              {def.label} {s.completedAt ? "✓" : ""}
+              {t(def.label)} {s.completedAt ? "✓" : ""}
             </H2>
             {s.measurements.length > 0 && (
               <dl className="grid grid-cols-2 gap-x-6 gap-y-0.5 sm:grid-cols-3">
                 {s.measurements.map((m) => (
                   <div key={m.id} className="flex justify-between gap-2">
-                    <dt className="text-muted-foreground">{m.type}</dt>
+                    <dt className="text-muted-foreground">{t(m.type)}</dt>
                     <dd className="font-semibold tabular-nums">{fmtNum(m.value, m.unit ?? undefined)}</dd>
                   </div>
                 ))}
@@ -138,17 +143,17 @@ export default async function PrintPage(props: PageProps<"/brews/[id]/print">) {
               <>
                 {gravity.length > 1 && (
                   <div className="my-3">
-                    <LineChart title="Gravity" series={[{ name: title, points: gravity }]} yDecimals={3} height={180} />
+                    <LineChart title={t("Gravity")} series={[{ name: title, points: gravity }]} yDecimals={3} height={180} />
                   </div>
                 )}
                 <table className="w-full tabular-nums">
                   <thead className="text-left text-xs text-muted-foreground">
                     <tr>
-                      <th className="font-medium">Day</th>
-                      <th className="font-medium">Temp</th>
-                      <th className="font-medium">Gravity</th>
+                      <th className="font-medium">{t("Day")}</th>
+                      <th className="font-medium">{t("Temp")}</th>
+                      <th className="font-medium">{t("Gravity")}</th>
                       <th className="font-medium">pH</th>
-                      <th className="font-medium">Notes</th>
+                      <th className="font-medium">{t("Notes")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -158,7 +163,7 @@ export default async function PrintPage(props: PageProps<"/brews/[id]/print">) {
                         <td>{l.temperature == null ? "–" : `${l.temperature}°C`}</td>
                         <td>{fmtSg(l.gravity)}</td>
                         <td>{fmtNum(l.ph)}</td>
-                        <td>{[l.activity, l.notes].filter(Boolean).join(" · ")}</td>
+                        <td>{[l.activity && t(l.activity), l.notes].filter(Boolean).join(" · ")}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -169,7 +174,7 @@ export default async function PrintPage(props: PageProps<"/brews/[id]/print">) {
             {s.problems.map((p) => (
               <div key={p.id} className="mt-2 rounded-md border border-warning-border bg-warning-bg p-2">
                 <strong>⚠️ {p.title}</strong>
-                {[p.description, p.cause && `Cause: ${p.cause}`, p.action && `Action: ${p.action}`, p.impact && `Impact: ${p.impact}`]
+                {[p.description, p.cause && t("Cause: {text}", { text: p.cause }), p.action && t("Action: {text}", { text: p.action }), p.impact && t("Impact: {text}", { text: p.impact })]
                   .filter(Boolean)
                   .map((line) => (
                     <p key={line}>{line}</p>
@@ -184,7 +189,7 @@ export default async function PrintPage(props: PageProps<"/brews/[id]/print">) {
                 {s.photos.map((ph) => (
                   <figure key={ph.id}>
                     {/* eslint-disable-next-line @next/next/no-img-element -- served from our own route */}
-                    <img src={`/photos/${ph.id}`} alt={ph.caption ?? def.label} className="w-full rounded border border-border" />
+                    <img src={`/photos/${ph.id}`} alt={ph.caption ?? t(def.label)} className="w-full rounded border border-border" />
                     {ph.caption && <figcaption className="text-xs text-muted-foreground">{ph.caption}</figcaption>}
                   </figure>
                 ))}
@@ -196,7 +201,7 @@ export default async function PrintPage(props: PageProps<"/brews/[id]/print">) {
 
       {(b.problems.length > 0 || b.lessons.length > 0) && (
         <section>
-          <H2>Other problems & lessons</H2>
+          <H2>{t("Other problems & lessons")}</H2>
           {b.problems.map((p) => (
             <p key={p.id}>
               ⚠️ <strong>{p.title}</strong>
@@ -210,7 +215,7 @@ export default async function PrintPage(props: PageProps<"/brews/[id]/print">) {
         </section>
       )}
 
-      <p className="mt-8 text-xs text-muted-foreground">Brewing Journal · exported {fmtDate(new Date())}</p>
+      <p className="mt-8 text-xs text-muted-foreground">{t("Brewing Journal")} · {t("exported {date}", { date: date(new Date()) })}</p>
     </article>
   );
 }

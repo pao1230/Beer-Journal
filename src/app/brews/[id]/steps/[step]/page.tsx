@@ -9,7 +9,6 @@ import {
   batchLabel,
   daysSince,
   fermentationSeries,
-  fmtDate,
   fmtNum,
   fmtSg,
   PACKAGING_METHODS,
@@ -34,6 +33,8 @@ import {
 import { ProblemCard, ProblemForm } from "../../../journal";
 import { PrimingCalculator } from "./priming-calculator";
 import { PhotoUploader } from "./photo-uploader";
+import { getI18n } from "@/lib/i18n/server";
+import type { T } from "@/lib/i18n/core";
 
 type Line = { label: string; value: string };
 type Addition = {
@@ -61,6 +62,7 @@ function targetsFor(
     mashSteps: { id: number; name: string; temperature: number; timeMin: number }[];
   },
   additions: Addition[],
+  t: T,
 ): { lines: Line[]; additions: Addition[]; additionsTitle?: string } {
   const at = (...stages: AdditionStage[]) => additions.filter((a) => stages.includes(a.stage));
   const totalWater = v.mashWaterL != null || v.spargeWaterL != null ? (v.mashWaterL ?? 0) + (v.spargeWaterL ?? 0) : null;
@@ -68,60 +70,60 @@ function targetsFor(
     case "WATER_PREP":
       return {
         lines: [
-          { label: "Source", value: v.waterSource ?? "–" },
-          { label: "Total water", value: fmtNum(totalWater, "L") },
-          { label: "Mash / sparge", value: `${fmtNum(v.mashWaterL, "L")} / ${fmtNum(v.spargeWaterL, "L")}` },
-          { label: "Target mash pH", value: fmtNum(v.targetMashPh) },
+          { label: t("Source"), value: v.waterSource ?? "–" },
+          { label: t("Total water"), value: fmtNum(totalWater, "L") },
+          { label: t("Mash / sparge"), value: `${fmtNum(v.mashWaterL, "L")} / ${fmtNum(v.spargeWaterL, "L")}` },
+          { label: t("Target mash pH"), value: fmtNum(v.targetMashPh) },
         ],
         additions: additions.filter((a) => a.type === "WATER"),
-        additionsTitle: "Water additions",
+        additionsTitle: t("Water additions"),
       };
     case "MASHING":
       return {
         lines: [
-          ...v.mashSteps.map((m, i) => ({ label: `${i + 1}. ${m.name}`, value: `${m.temperature}°C · ${m.timeMin} min` })),
-          { label: "Mash water", value: fmtNum(v.mashWaterL, "L") },
-          { label: "Target pH", value: fmtNum(v.targetMashPh) },
+          ...v.mashSteps.map((m, i) => ({ label: `${i + 1}. ${m.name}`, value: `${m.temperature}°C · ${t("{n} min", { n: m.timeMin })}` })),
+          { label: t("Mash water"), value: fmtNum(v.mashWaterL, "L") },
+          { label: t("Target pH"), value: fmtNum(v.targetMashPh) },
         ],
         additions: at("MASH").filter((a) => a.type !== "WATER"),
-        additionsTitle: "Grain bill & mash additions",
+        additionsTitle: t("Grain bill & mash additions"),
       };
     case "SPARGING":
       return {
-        lines: [{ label: "Sparge water", value: fmtNum(v.spargeWaterL, "L") }],
+        lines: [{ label: t("Sparge water"), value: fmtNum(v.spargeWaterL, "L") }],
         additions: at("SPARGE"),
       };
     case "BOILING": {
       const pre = preBoilVolume(v.batchSize, v.boilTime, v.equipmentProfile);
       return {
         lines: [
-          { label: "Boil time", value: fmtNum(v.boilTime, "min") },
-          { label: "Est. pre-boil volume", value: pre == null ? "– (no equipment profile)" : `${pre.toFixed(1)} L` },
-          { label: "Target OG", value: fmtSg(v.targetOg) },
+          { label: t("Boil time"), value: t("{n} min", { n: v.boilTime }) },
+          { label: t("Est. pre-boil volume"), value: pre == null ? t("– (no equipment profile)") : `${pre.toFixed(1)} L` },
+          { label: t("Target OG"), value: fmtSg(v.targetOg) },
         ],
         additions: at("BOIL", "WHIRLPOOL").sort((a, b) => (b.time ?? -1) - (a.time ?? -1)),
-        additionsTitle: "Boil timeline",
+        additionsTitle: t("Boil timeline"),
       };
     }
     case "COOLING":
       return {
-        lines: [{ label: "Target volume", value: fmtNum(v.batchSize, "L") }],
+        lines: [{ label: t("Target volume"), value: fmtNum(v.batchSize, "L") }],
         additions: additions.filter((a) => a.type === "YEAST"),
-        additionsTitle: "Yeast to pitch",
+        additionsTitle: t("Yeast to pitch"),
       };
     case "FERMENTATION":
       return {
         lines: [
-          { label: "Target OG", value: fmtSg(v.targetOg) },
-          { label: "Target FG", value: fmtSg(v.targetFg) },
+          { label: t("Target OG"), value: fmtSg(v.targetOg) },
+          { label: t("Target FG"), value: fmtSg(v.targetFg) },
         ],
         additions: at("FERMENTATION", "DRY_HOP"),
       };
     case "PACKAGING":
       return {
         lines: [
-          { label: "Target carbonation", value: fmtNum(v.targetCarbonation, "vol CO2") },
-          { label: "Batch size", value: fmtNum(v.batchSize, "L") },
+          { label: t("Target carbonation"), value: fmtNum(v.targetCarbonation, "vol CO2") },
+          { label: t("Batch size"), value: fmtNum(v.batchSize, "L") },
         ],
         additions: at("PACKAGING"),
       };
@@ -173,6 +175,7 @@ export default async function StepPage(props: PageProps<"/brews/[id]/steps/[step
   const def = stepBySlug(params.step);
   const sessionId = Number(params.id);
   if (!def || !Number.isInteger(sessionId)) notFound();
+  const { t, date } = await getI18n();
 
   const session = await db.brewSession.findUnique({
     where: { id: sessionId },
@@ -222,7 +225,7 @@ export default async function StepPage(props: PageProps<"/brews/[id]/steps/[step
     stage: i.stage,
     type: i.ingredient?.type ?? null,
   }));
-  const target = targetsFor(def.type, v, additions);
+  const target = targetsFor(def.type, v, additions, t);
   const presetTypes = new Set(def.presets.map((p) => p.type));
   const readings = new Map(step.measurements.map((m) => [m.type, m.value]));
   const extraMeasurements = step.measurements.filter((m) => !presetTypes.has(m.type));
@@ -261,7 +264,7 @@ export default async function StepPage(props: PageProps<"/brews/[id]/steps/[step
   const current = fermentationSeries(session.brewDate, session.actualOg, step.fermentationLog);
   const prior = previous && prevStep ? fermentationSeries(previous.brewDate, previous.actualOg, prevStep.fermentationLog) : null;
   const withPrevious = (key: "gravity" | "temperature" | "ph"): ChartSeries[] => [
-    { name: `${title} (this batch)`, points: current[key] },
+    { name: t("{name} (this batch)", { name: title }), points: current[key] },
     ...(prior && prior[key].length > 0
       ? [{ name: batchLabel(session.recipe.name, previous!.batchNumber), points: prior[key] }]
       : []),
@@ -270,7 +273,7 @@ export default async function StepPage(props: PageProps<"/brews/[id]/steps/[step
   return (
     <>
       <PageHeader
-        title={`${idx + 1}. ${def.label}`}
+        title={`${idx + 1}. ${t(def.label)}`}
         subtitle={
           <Link href={base} className="underline">
             {title}
@@ -279,7 +282,7 @@ export default async function StepPage(props: PageProps<"/brews/[id]/steps/[step
         actions={
           <form action={setStepComplete.bind(null, step.id, !step.completedAt)}>
             <Button variant={step.completedAt ? "secondary" : "primary"}>
-              {step.completedAt ? "✓ Completed — reopen" : "Complete step"}
+              {step.completedAt ? t("✓ Completed — reopen") : t("Complete step")}
             </Button>
           </form>
         }
@@ -288,7 +291,7 @@ export default async function StepPage(props: PageProps<"/brews/[id]/steps/[step
       <div className="grid gap-4 md:grid-cols-3">
         <div className="flex min-w-0 flex-col gap-4 md:col-span-2">
           <Card>
-            <CardTitle>Target</CardTitle>
+            <CardTitle>{t("Target")}</CardTitle>
             <dl className="grid grid-cols-2 gap-y-1 text-sm">
               {target.lines.map((l) => (
                 <div key={l.label} className="contents">
@@ -300,7 +303,7 @@ export default async function StepPage(props: PageProps<"/brews/[id]/steps/[step
             {target.additions.length > 0 && (
               <>
                 <h3 className="mt-3 mb-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                  {target.additionsTitle ?? "Additions"}
+                  {target.additionsTitle ?? t("Additions")}
                 </h3>
                 <ul className="text-sm">
                   {target.additions.map((a) => (
@@ -308,7 +311,7 @@ export default async function StepPage(props: PageProps<"/brews/[id]/steps/[step
                       <span>
                         {a.time != null && (
                           <span className="mr-2 inline-block w-14 text-muted-foreground tabular-nums">
-                            {a.stage === "DRY_HOP" ? `day ${a.time}` : `${a.time} min`}
+                            {a.stage === "DRY_HOP" ? t("day {n}", { n: a.time }) : t("{n} min", { n: a.time })}
                           </span>
                         )}
                         {a.name}
@@ -322,41 +325,43 @@ export default async function StepPage(props: PageProps<"/brews/[id]/steps/[step
           </Card>
 
           <Card>
-            <CardTitle>Actual</CardTitle>
+            <CardTitle>{t("Actual")}</CardTitle>
             {warnings.map((w) => (
               <div
                 key={w.label}
                 className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-warning-border bg-warning-bg px-3 py-2 text-sm"
               >
                 <span>
-                  ⚠️ {w.message}: target {w.target}, actual {w.actual}
+                  ⚠️ {t(w.message)}: {t("target {target}, actual {actual}", { target: w.target, actual: w.actual })}
                 </span>
                 <Link
                   className="font-medium underline"
-                  href={`${base}/steps/${def.slug}?problem=${encodeURIComponent(w.message)}&detail=${encodeURIComponent(`Target ${w.target}, actual ${w.actual}`)}#new-problem`}
+                  href={`${base}/steps/${def.slug}?problem=${encodeURIComponent(t(w.message))}&detail=${encodeURIComponent(t("Target {target}, actual {actual}", { target: w.target, actual: w.actual }))}#new-problem`}
                 >
-                  Log as problem
+                  {t("Log as problem")}
                 </Link>
               </div>
             ))}
             <ActionForm action={saveStepActuals.bind(null, step.id)} className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {def.type === "PACKAGING" && (
-                <Field label="Method">
+                <Field label={t("Method")}>
                   <Select name="packagingMethod" defaultValue={session.packagingMethod ?? ""}>
                     <option value="">–</option>
                     {PACKAGING_METHODS.map((m) => (
-                      <option key={m}>{m}</option>
+                      <option key={m} value={m}>
+                        {t(m)}
+                      </option>
                     ))}
                   </Select>
                 </Field>
               )}
               {def.presets.map((p, i) => (
-                <Field key={p.type} label={p.unit ? `${p.type} (${p.unit})` : p.type}>
+                <Field key={p.type} label={p.unit ? `${t(p.type)} (${p.unit})` : t(p.type)}>
                   <Input name={`preset-${i}`} type="number" step={p.step ?? "any"} inputMode="decimal" defaultValue={readings.get(p.type) ?? ""} />
                 </Field>
               ))}
               <div className="col-span-2 sm:col-span-3">
-                <Button type="submit">Save readings</Button>
+                <Button type="submit">{t("Save readings")}</Button>
               </div>
             </ActionForm>
 
@@ -365,11 +370,11 @@ export default async function StepPage(props: PageProps<"/brews/[id]/steps/[step
                 {extraMeasurements.map((m) => (
                   <li key={m.id} className="flex items-center justify-between gap-2 py-1.5">
                     <span>
-                      {m.type}: <strong className="tabular-nums">{fmtNum(m.value, m.unit ?? undefined)}</strong>
+                      {t(m.type)}: <strong className="tabular-nums">{fmtNum(m.value, m.unit ?? undefined)}</strong>
                       {m.notes && <span className="ml-2 text-muted-foreground">{m.notes}</span>}
                     </span>
                     <form action={deleteMeasurement.bind(null, m.id)}>
-                      <button aria-label="Delete measurement" className="rounded p-1 text-muted-foreground hover:bg-muted">
+                      <button aria-label={t("Delete measurement")} className="rounded p-1 text-muted-foreground hover:bg-muted">
                         <X className="size-4" />
                       </button>
                     </form>
@@ -378,22 +383,22 @@ export default async function StepPage(props: PageProps<"/brews/[id]/steps/[step
               </ul>
             )}
             <details className="mt-3">
-              <summary className="cursor-pointer text-sm font-medium">+ Add another measurement</summary>
+              <summary className="cursor-pointer text-sm font-medium">{t("+ Add another measurement")}</summary>
               <ActionForm action={addMeasurement.bind(null, step.id)} resetOnSuccess className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-[1fr_6rem_5rem_1fr_auto] sm:items-end">
-                <Field label="Name">
-                  <Input name="type" required placeholder="Grain bed temp" />
+                <Field label={t("Name")}>
+                  <Input name="type" required placeholder={t("Grain bed temp")} />
                 </Field>
-                <Field label="Value">
+                <Field label={t("Value")}>
                   <Input name="value" type="number" step="any" required />
                 </Field>
-                <Field label="Unit">
+                <Field label={t("Unit")}>
                   <Input name="unit" placeholder="°C" />
                 </Field>
-                <Field label="Note">
+                <Field label={t("Note")}>
                   <Input name="notes" />
                 </Field>
                 <Button type="submit" variant="secondary">
-                  Add
+                  {t("Add")}
                 </Button>
               </ActionForm>
             </details>
@@ -403,14 +408,14 @@ export default async function StepPage(props: PageProps<"/brews/[id]/steps/[step
             <Card className="flex flex-col gap-6">
               {current.gravity.length > 0 && (
                 <LineChart
-                  title="Gravity"
+                  title={t("Gravity")}
                   series={withPrevious("gravity")}
                   yDecimals={3}
-                  referenceLines={v.targetFg != null ? [{ y: v.targetFg, label: `Target FG ${fmtSg(v.targetFg)}` }] : []}
+                  referenceLines={v.targetFg != null ? [{ y: v.targetFg, label: t("Target FG {fg}", { fg: fmtSg(v.targetFg) }) }] : []}
                 />
               )}
               {current.temperature.length > 0 && (
-                <LineChart title="Temperature (°C)" series={withPrevious("temperature")} yDecimals={1} yUnit="°C" height={180} />
+                <LineChart title={t("Temperature (°C)")} series={withPrevious("temperature")} yDecimals={1} yUnit="°C" height={180} />
               )}
               {current.ph.length > 0 && <LineChart title="pH" series={withPrevious("ph")} yDecimals={2} height={160} />}
             </Card>
@@ -418,17 +423,17 @@ export default async function StepPage(props: PageProps<"/brews/[id]/steps/[step
 
           {def.type === "FERMENTATION" && (
             <Card>
-              <CardTitle>Daily log</CardTitle>
+              <CardTitle>{t("Daily log")}</CardTitle>
               {step.fermentationLog.length > 0 && (
                 <div className="mb-3 overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="text-left text-xs text-muted-foreground">
                       <tr>
-                        <th className="py-1 pr-2 font-medium">Day</th>
-                        <th className="py-1 pr-2 font-medium">Temp</th>
-                        <th className="py-1 pr-2 font-medium">Gravity</th>
+                        <th className="py-1 pr-2 font-medium">{t("Day")}</th>
+                        <th className="py-1 pr-2 font-medium">{t("Temp")}</th>
+                        <th className="py-1 pr-2 font-medium">{t("Gravity")}</th>
                         <th className="py-1 pr-2 font-medium">pH</th>
-                        <th className="py-1 pr-2 font-medium">Activity / notes</th>
+                        <th className="py-1 pr-2 font-medium">{t("Activity / notes")}</th>
                         <th />
                       </tr>
                     </thead>
@@ -436,15 +441,15 @@ export default async function StepPage(props: PageProps<"/brews/[id]/steps/[step
                       {step.fermentationLog.map((e) => (
                         <tr key={e.id}>
                           <td className="py-1.5 pr-2">
-                            {dayOf(e.date)} <span className="text-xs text-muted-foreground">{fmtDate(e.date)}</span>
+                            {dayOf(e.date)} <span className="text-xs text-muted-foreground">{date(e.date)}</span>
                           </td>
                           <td className="py-1.5 pr-2">{e.temperature == null ? "–" : `${e.temperature}°C`}</td>
                           <td className="py-1.5 pr-2">{fmtSg(e.gravity)}</td>
                           <td className="py-1.5 pr-2">{fmtNum(e.ph)}</td>
-                          <td className="py-1.5 pr-2">{[e.activity, e.notes].filter(Boolean).join(" · ")}</td>
+                          <td className="py-1.5 pr-2">{[e.activity && t(e.activity), e.notes].filter(Boolean).join(" · ")}</td>
                           <td className="py-1.5 text-right">
                             <form action={deleteFermentationLog.bind(null, e.id)}>
-                              <button aria-label="Delete entry" className="rounded p-1 text-muted-foreground hover:bg-muted">
+                              <button aria-label={t("Delete entry")} className="rounded p-1 text-muted-foreground hover:bg-muted">
                                 <X className="size-4" />
                               </button>
                             </form>
@@ -456,33 +461,34 @@ export default async function StepPage(props: PageProps<"/brews/[id]/steps/[step
                 </div>
               )}
               <ActionForm action={addFermentationLog.bind(null, step.id)} resetOnSuccess className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                <Field label="Date">
+                <Field label={t("Date")}>
                   <Input name="date" type="date" required defaultValue={today} />
                 </Field>
-                <Field label="Temp (°C)">
+                <Field label={t("Temp (°C)")}>
                   <Input name="temperature" type="number" step="0.1" inputMode="decimal" />
                 </Field>
-                <Field label="Gravity">
+                <Field label={t("Gravity")}>
                   <Input name="gravity" type="number" step="0.001" min="0.99" max="1.2" inputMode="decimal" />
                 </Field>
                 <Field label="pH">
                   <Input name="ph" type="number" step="0.01" inputMode="decimal" />
                 </Field>
-                <Field label="Activity">
+                <Field label={t("Activity")}>
                   <Select name="activity" defaultValue="">
                     <option value="">–</option>
-                    <option>None</option>
-                    <option>Low</option>
-                    <option>Medium</option>
-                    <option>High</option>
+                    {["None", "Low", "Medium", "High"].map((a) => (
+                      <option key={a} value={a}>
+                        {t(a)}
+                      </option>
+                    ))}
                   </Select>
                 </Field>
-                <Field label="Notes">
-                  <Input name="notes" placeholder="Lots of krausen" />
+                <Field label={t("Notes")}>
+                  <Input name="notes" placeholder={t("Lots of krausen")} />
                 </Field>
                 <div className="col-span-2 sm:col-span-3">
                   <Button type="submit" variant="secondary">
-                    Add log entry
+                    {t("Add log entry")}
                   </Button>
                 </div>
               </ActionForm>
@@ -491,13 +497,13 @@ export default async function StepPage(props: PageProps<"/brews/[id]/steps/[step
 
           {primingDefaults && (
             <Card>
-              <CardTitle>Priming sugar</CardTitle>
+              <CardTitle>{t("Priming sugar")}</CardTitle>
               <PrimingCalculator {...primingDefaults} />
             </Card>
           )}
 
           <Card>
-            <CardTitle>Photos</CardTitle>
+            <CardTitle>{t("Photos")}</CardTitle>
             {step.photos.length > 0 && (
               <ul className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {step.photos.map((p) => (
@@ -506,7 +512,7 @@ export default async function StepPage(props: PageProps<"/brews/[id]/steps/[step
                       {/* eslint-disable-next-line @next/next/no-img-element -- served from our own route; already resized */}
                       <img
                         src={`/photos/${p.id}`}
-                        alt={p.caption ?? `${def.label} photo`}
+                        alt={p.caption ?? t("{step} photo", { step: t(def.label) })}
                         width={p.width ?? undefined}
                         height={p.height ?? undefined}
                         loading="lazy"
@@ -515,7 +521,7 @@ export default async function StepPage(props: PageProps<"/brews/[id]/steps/[step
                     </a>
                     {p.caption && <p className="mt-1 truncate text-xs text-muted-foreground">{p.caption}</p>}
                     <form action={deletePhoto.bind(null, p.id)} className="absolute top-1 right-1">
-                      <button aria-label="Delete photo" className="rounded-full bg-card/90 p-1 text-muted-foreground shadow hover:bg-muted">
+                      <button aria-label={t("Delete photo")} className="rounded-full bg-card/90 p-1 text-muted-foreground shadow hover:bg-muted">
                         <X className="size-4" />
                       </button>
                     </form>
@@ -527,19 +533,19 @@ export default async function StepPage(props: PageProps<"/brews/[id]/steps/[step
           </Card>
 
           <Card>
-            <CardTitle>Notes</CardTitle>
+            <CardTitle>{t("Notes")}</CardTitle>
             <ActionForm action={saveStepNotes.bind(null, step.id)} className="flex flex-col gap-2">
-              <Textarea name="notes" rows={4} defaultValue={step.notes ?? ""} placeholder="What happened? Anything a number can't capture." />
+              <Textarea name="notes" rows={4} defaultValue={step.notes ?? ""} placeholder={t("What happened? Anything a number can't capture.")} />
               <div>
                 <Button type="submit" variant="secondary">
-                  Save notes
+                  {t("Save notes")}
                 </Button>
               </div>
             </ActionForm>
           </Card>
 
           <Card>
-            <CardTitle>Problems</CardTitle>
+            <CardTitle>{t("Problems")}</CardTitle>
             <div className="flex flex-col gap-2">
               {step.problems.map((p) => (
                 <ProblemCard key={p.id} problem={p} />
@@ -551,24 +557,24 @@ export default async function StepPage(props: PageProps<"/brews/[id]/steps/[step
 
         <aside className="flex flex-col gap-4">
           <Card className="border-dashed">
-            <CardTitle>Previous brew</CardTitle>
+            <CardTitle>{t("Previous brew")}</CardTitle>
             {!previous || !prevStep ? (
-              <p className="text-sm text-muted-foreground">No earlier batch of this recipe yet.</p>
+              <p className="text-sm text-muted-foreground">{t("No earlier batch of this recipe yet.")}</p>
             ) : (
               <div className="flex flex-col gap-3 text-sm">
                 <Link href={`/brews/${previous.id}/steps/${def.slug}`} className="font-medium underline">
-                  {batchLabel(session.recipe.name, previous.batchNumber)} · {fmtDate(previous.brewDate)}
+                  {batchLabel(session.recipe.name, previous.batchNumber)} · {date(previous.brewDate)}
                 </Link>
                 {prevStep.measurements.length === 0 ? (
-                  <p className="text-muted-foreground">No readings recorded.</p>
+                  <p className="text-muted-foreground">{t("No readings recorded.")}</p>
                 ) : (
                   <dl className="grid grid-cols-[1fr_auto_auto] gap-x-3 gap-y-0.5">
                     <dt className="text-xs text-muted-foreground" />
-                    <dd className="text-xs text-muted-foreground">Then</dd>
-                    <dd className="text-xs text-muted-foreground">Now</dd>
+                    <dd className="text-xs text-muted-foreground">{t("Then")}</dd>
+                    <dd className="text-xs text-muted-foreground">{t("Now")}</dd>
                     {prevStep.measurements.map((m) => (
                       <div key={m.id} className="contents">
-                        <dt className="text-muted-foreground">{m.type}</dt>
+                        <dt className="text-muted-foreground">{t(m.type)}</dt>
                         <dd className="tabular-nums">{fmtNum(m.value, m.unit ?? undefined)}</dd>
                         <dd className="font-semibold tabular-nums">{fmtNum(readings.get(m.type), m.unit ?? undefined)}</dd>
                       </div>
@@ -586,20 +592,20 @@ export default async function StepPage(props: PageProps<"/brews/[id]/steps/[step
           <nav className="flex justify-between gap-2">
             {prevDef ? (
               <ButtonLink variant="secondary" href={`${base}/steps/${prevDef.slug}`}>
-                <ChevronLeft className="size-4" /> {prevDef.label}
+                <ChevronLeft className="size-4" /> {t(prevDef.label)}
               </ButtonLink>
             ) : (
               <ButtonLink variant="secondary" href={base}>
-                <ChevronLeft className="size-4" /> Overview
+                <ChevronLeft className="size-4" /> {t("Overview")}
               </ButtonLink>
             )}
             {nextDef ? (
               <ButtonLink variant="secondary" href={`${base}/steps/${nextDef.slug}`}>
-                {nextDef.label} <ChevronRight className="size-4" />
+                {t(nextDef.label)} <ChevronRight className="size-4" />
               </ButtonLink>
             ) : (
               <ButtonLink variant="secondary" href={base}>
-                Overview <ChevronRight className="size-4" />
+                {t("Overview")} <ChevronRight className="size-4" />
               </ButtonLink>
             )}
           </nav>

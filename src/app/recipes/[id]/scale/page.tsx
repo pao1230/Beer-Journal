@@ -4,10 +4,15 @@ import { Button, ButtonLink, Card, CardTitle, Field, Input, PageHeader } from "@
 import { db } from "@/lib/db";
 import { fmtNum, preBoilVolume, roundAmount, scaleWater, STAGES } from "@/lib/brewing";
 import { saveScaledRecipe } from "../../actions";
+import { getI18n } from "@/lib/i18n/server";
 
-export const metadata = { title: "Scale recipe" };
+export async function generateMetadata() {
+  const { t } = await getI18n();
+  return { title: t("Scale recipe") };
+}
 
 export default async function ScaleRecipePage(props: PageProps<"/recipes/[id]/scale">) {
+  const { t } = await getI18n();
   const id = Number((await props.params).id);
   const sp = await props.searchParams;
   const version = Number.isInteger(id)
@@ -30,18 +35,18 @@ export default async function ScaleRecipePage(props: PageProps<"/recipes/[id]/sc
   return (
     <>
       <PageHeader
-        title={`Scale ${version.recipe.name}`}
-        subtitle={`From v${version.version} · ${version.batchSize} L. Gravity and bitterness targets stay the same; hop timing and mash temperatures are unchanged.`}
+        title={t("Scale {name}", { name: version.recipe.name })}
+        subtitle={t("From v{v} · {size} L. Gravity and bitterness targets stay the same; hop timing and mash temperatures are unchanged.", { v: version.version, size: version.batchSize })}
       />
 
       <Card className="mb-4">
         <form className="flex flex-wrap items-end gap-2">
           {typeof sp.v === "string" && <input type="hidden" name="v" value={sp.v} />}
-          <Field label="New batch size (L)">
+          <Field label={t("New batch size (L)")}>
             <Input name="size" type="number" step="0.1" min="0.1" max="2000" required defaultValue={valid ? size : ""} className="w-40" />
           </Field>
           <Button type="submit" variant="secondary">
-            Preview
+            {t("Preview")}
           </Button>
           {[0.5, 2].map((f) => (
             <ButtonLink key={f} variant="ghost" href={`/recipes/${id}/scale?size=${version.batchSize * f}${typeof sp.v === "string" ? `&v=${sp.v}` : ""}`}>
@@ -55,14 +60,14 @@ export default async function ScaleRecipePage(props: PageProps<"/recipes/[id]/sc
         <>
           <Card className="mb-4">
             <CardTitle>
-              Preview · ×{Number(ratio.toFixed(3))}
+              {t("Preview")} · ×{Number(ratio.toFixed(3))}
             </CardTitle>
             <div className="overflow-x-auto">
               <table className="w-full text-sm tabular-nums">
                 <thead className="text-left text-xs text-muted-foreground">
                   <tr>
-                    <th className="py-1 pr-3 font-medium">Ingredient</th>
-                    <th className="py-1 pr-3 font-medium">Stage</th>
+                    <th className="py-1 pr-3 font-medium">{t("Ingredient")}</th>
+                    <th className="py-1 pr-3 font-medium">{t("Stage")}</th>
                     <th className="py-1 pr-3 text-right font-medium">{version.batchSize} L</th>
                     <th className="py-1 text-right font-medium">{size} L</th>
                   </tr>
@@ -72,27 +77,28 @@ export default async function ScaleRecipePage(props: PageProps<"/recipes/[id]/sc
                     <tr key={i.id}>
                       <td className="py-1.5 pr-3">{i.nameSnapshot}</td>
                       <td className="py-1.5 pr-3 text-muted-foreground">
-                        {STAGES.find((s) => s.value === i.stage)?.label}
-                        {i.additionTime != null && ` · ${i.additionTime}${i.stage === "DRY_HOP" ? "d" : " min"}`}
+                        {t(STAGES.find((s) => s.value === i.stage)?.label ?? i.stage)}
+                        {i.additionTime != null &&
+                          ` · ${i.stage === "DRY_HOP" ? t("day {n}", { n: i.additionTime }) : t("{n} min", { n: i.additionTime })}`}
                       </td>
                       <td className="py-1.5 pr-3 text-right text-muted-foreground">{fmtNum(i.amount, i.unit)}</td>
                       <td className="py-1.5 text-right font-semibold">{fmtNum(roundAmount(i.amount * ratio, i.unit), i.unit)}</td>
                     </tr>
                   ))}
                   <tr>
-                    <td className="py-1.5 pr-3">Mash water</td>
+                    <td className="py-1.5 pr-3">{t("Mash water")}</td>
                     <td />
                     <td className="py-1.5 pr-3 text-right text-muted-foreground">{fmtNum(version.mashWaterL, "L")}</td>
                     <td className="py-1.5 text-right font-semibold">{fmtNum(water.mashWaterL, "L")}</td>
                   </tr>
                   <tr>
-                    <td className="py-1.5 pr-3">Sparge water</td>
+                    <td className="py-1.5 pr-3">{t("Sparge water")}</td>
                     <td />
                     <td className="py-1.5 pr-3 text-right text-muted-foreground">{fmtNum(version.spargeWaterL, "L")}</td>
                     <td className="py-1.5 text-right font-semibold">{fmtNum(water.spargeWaterL, "L")}</td>
                   </tr>
                   <tr>
-                    <td className="py-1.5 pr-3">Est. pre-boil volume</td>
+                    <td className="py-1.5 pr-3">{t("Est. pre-boil volume")}</td>
                     <td />
                     <td className="py-1.5 pr-3 text-right text-muted-foreground">{fmtNum(preBoil(version.batchSize) && Number(preBoil(version.batchSize)!.toFixed(1)), "L")}</td>
                     <td className="py-1.5 text-right font-semibold">{fmtNum(preBoil(size) && Number(preBoil(size)!.toFixed(1)), "L")}</td>
@@ -102,19 +108,19 @@ export default async function ScaleRecipePage(props: PageProps<"/recipes/[id]/sc
             </div>
             <p className="mt-3 text-xs text-muted-foreground">
               {version.equipmentProfile
-                ? `Boil-off, trub loss and deadspace from “${version.equipmentProfile.name}” stay fixed, so sparge water doesn't scale 1:1.`
-                : "No equipment profile on this recipe, so water is scaled 1:1."}{" "}
-              Yeast packs round up. Check hop utilisation if you change kettle size a lot.
+                ? t("Boil-off, trub loss and deadspace from “{name}” stay fixed, so sparge water doesn't scale 1:1.", { name: version.equipmentProfile.name })
+                : t("No equipment profile on this recipe, so water is scaled 1:1.")}{" "}
+              {t("Yeast packs round up. Check hop utilisation if you change kettle size a lot.")}
             </p>
           </Card>
 
           <ActionForm action={saveScaledRecipe.bind(null, version.id)} className="flex flex-wrap gap-2">
             <input type="hidden" name="size" value={size} />
             <Button type="submit" name="mode" value="copy">
-              Save as new recipe
+              {t("Save as new recipe")}
             </Button>
             <Button type="submit" name="mode" value="version" variant="secondary">
-              Save as v{nextVersion} of this recipe
+              {t("Save as v{n} of this recipe", { n: nextVersion })}
             </Button>
           </ActionForm>
         </>

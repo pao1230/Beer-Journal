@@ -1,3 +1,5 @@
+import { UserError } from "@/lib/user-error";
+
 export function str(fd: FormData, key: string): string | null {
   const v = fd.get(key);
   if (typeof v !== "string") return null;
@@ -9,7 +11,7 @@ export function num(fd: FormData, key: string): number | null {
   const v = str(fd, key);
   if (v == null) return null;
   const n = Number(v);
-  if (!Number.isFinite(n)) throw new Error(`"${key}" must be a number`);
+  if (!Number.isFinite(n)) throw new UserError("“{field}” must be a number", { field: key });
   return n;
 }
 
@@ -19,7 +21,7 @@ export function int(fd: FormData, key: string): number | null {
 }
 
 export function required<T>(value: T | null, name: string): T {
-  if (value == null) throw new Error(`${name} is required`);
+  if (value == null) throw new UserError("{name} is required", { name });
   return value;
 }
 

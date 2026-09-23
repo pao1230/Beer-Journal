@@ -2,10 +2,15 @@ import Link from "next/link";
 import { ButtonLink, Card, Empty, PageHeader } from "@/components/ui";
 import { db } from "@/lib/db";
 import { abv, fmtAbv, fmtSg } from "@/lib/brewing";
+import { getI18n } from "@/lib/i18n/server";
 
-export const metadata = { title: "Recipes" };
+export async function generateMetadata() {
+  const { t } = await getI18n();
+  return { title: t("Recipes") };
+}
 
 export default async function RecipesPage() {
+  const { t } = await getI18n();
   const recipes = await db.recipe.findMany({
     orderBy: { updatedAt: "desc" },
     include: {
@@ -15,10 +20,10 @@ export default async function RecipesPage() {
   });
   return (
     <>
-      <PageHeader title="Recipes" actions={<ButtonLink href="/recipes/new">+ New recipe</ButtonLink>} />
+      <PageHeader title={t("Recipes")} actions={<ButtonLink href="/recipes/new">{t("+ New recipe")}</ButtonLink>} />
       {recipes.length === 0 ? (
         <Card>
-          <Empty>No recipes yet. Add a few ingredients first, then create your first recipe.</Empty>
+          <Empty>{t("No recipes yet. Add a few ingredients first, then create your first recipe.")}</Empty>
         </Card>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
@@ -37,7 +42,7 @@ export default async function RecipesPage() {
                       {v.batchSize} L · OG {fmtSg(v.targetOg)} · FG {fmtSg(v.targetFg)} · {fmtAbv(abv(v.targetOg, v.targetFg))}
                     </div>
                   )}
-                  <div className="mt-1 text-xs text-muted-foreground">{r._count.sessions} brew(s)</div>
+                  <div className="mt-1 text-xs text-muted-foreground">{t("{n} brew(s)", { n: r._count.sessions })}</div>
                 </Card>
               </Link>
             );

@@ -38,6 +38,9 @@ batch learns from the last one. See [PLAN.md](PLAN.md) for the full product plan
 - **Photos** on any brew step — resized in the browser, stored in Postgres (no external storage)
 - **Export** — CSV of all brews or one brew's full record (Excel-friendly UTF-8), and a printable
   report you can save as PDF (renders Thai correctly)
+- **Thai / English UI** — ไทย/EN switch in the top bar (remembered in a cookie; first visit follows
+  the browser language). Dates show in the Thai calendar in Thai. Brewing abbreviations (OG, FG,
+  ABV, IBU, SRM, pH) and units stay as they are
 - Mobile bottom nav, installable web app manifest, optional basic auth
 
 ## Stack
@@ -105,5 +108,13 @@ src/components/line-chart   dependency-free SVG line chart
 src/lib/search.ts           query parsing, filters, highlighting
 src/lib/calc.ts             IBU/SRM/OG/FG, water profile, efficiency, priming sugar
 src/lib/inventory.ts        stock ledger math and costing
+src/lib/i18n                translations: English text is the key, th.ts has the Thai;
+                            getI18n() on the server, useI18n() in client components
 src/app/inventory           inventory page, stock card, inventory actions
 ```
+
+## Adding text
+
+Wrap UI text in `t("…")` (server: `const { t } = await getI18n()`, client: `useI18n()`), with
+`{placeholders}` for values, and add the Thai to `src/lib/i18n/th.ts`. `npm test` fails if a
+string in the source has no Thai translation or a translation drops a placeholder.

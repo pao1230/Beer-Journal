@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { dayTicks, niceTicks } from "@/lib/chart";
+import { useI18n } from "@/lib/i18n/client";
 
 /** `slot` pins a series to a palette color so it keeps its color when other series are absent. */
 export type ChartSeries = { name: string; points: { x: number; y: number }[]; slot?: number };
@@ -30,6 +31,7 @@ export function LineChart({ title, series: input, yDecimals, yUnit = "", referen
       })),
     [input],
   );
+  const { t: tr } = useI18n();
   const wrapRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(600);
   const [active, setActive] = useState<number | null>(null);
@@ -90,7 +92,7 @@ export function LineChart({ title, series: input, yDecimals, yUnit = "", referen
     <figure className="flex min-w-0 flex-col gap-2">
       <figcaption className="text-sm font-semibold">{title}</figcaption>
       {series.length >= 2 && (
-        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-label="Legend">
+        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-label={tr("Legend")}>
           {series.map((s) => (
             <li key={s.name} className="flex items-center gap-1.5">
               <svg width="14" height="4" aria-hidden>
@@ -107,7 +109,7 @@ export function LineChart({ title, series: input, yDecimals, yUnit = "", referen
         style={{ height }}
         tabIndex={0}
         role="group"
-        aria-label={`${title}. Use left and right arrow keys to read values.`}
+        aria-label={`${title}. ${tr("Use left and right arrow keys to read values.")}`}
         onPointerMove={onMove}
         onPointerDown={onMove}
         onPointerLeave={() => setActive(null)}
@@ -127,7 +129,7 @@ export function LineChart({ title, series: input, yDecimals, yUnit = "", referen
           <line x1={M.left} x2={M.left + plotW} y1={M.top + plotH} y2={M.top + plotH} stroke="var(--chart-axis)" strokeWidth="1" />
           {xTicks.map((t) => (
             <text key={t} x={sx(t)} y={M.top + plotH + 18} textAnchor="middle" fontSize="11" fill="var(--chart-ink-muted)" className="tabular-nums">
-              {t === xTicks[0] ? `Day ${t}` : t}
+              {t === xTicks[0] ? tr("Day {n}", { n: t }) : t}
             </text>
           ))}
 
@@ -187,7 +189,7 @@ export function LineChart({ title, series: input, yDecimals, yUnit = "", referen
             className="pointer-events-none absolute top-2 z-10 min-w-32 rounded-md border border-border bg-card px-3 py-2 text-xs shadow-md"
             style={flip ? { right: width - tooltipLeft + 10 } : { left: tooltipLeft + 10 }}
           >
-            <div className="mb-1 text-muted-foreground">Day {activeX}</div>
+            <div className="mb-1 text-muted-foreground">{tr("Day {n}", { n: activeX })}</div>
             {series.map((s) => {
               const p = s.points.find((pt) => pt.x === activeX);
               return (
@@ -205,11 +207,11 @@ export function LineChart({ title, series: input, yDecimals, yUnit = "", referen
       </div>
 
       <details className="no-print text-xs">
-        <summary className="cursor-pointer text-muted-foreground">Show data table</summary>
+        <summary className="cursor-pointer text-muted-foreground">{tr("Show data table")}</summary>
         <table className="mt-2 w-full tabular-nums">
           <thead className="text-left text-muted-foreground">
             <tr>
-              <th className="py-1 pr-3 font-medium">Day</th>
+              <th className="py-1 pr-3 font-medium">{tr("Day")}</th>
               {series.map((s) => (
                 <th key={s.name} className="py-1 pr-3 font-medium">
                   {s.name}

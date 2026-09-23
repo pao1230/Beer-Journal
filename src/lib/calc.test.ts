@@ -72,8 +72,8 @@ describe("gravity and color", () => {
   it("warns about grains without potential and assumed efficiency", () => {
     const r = calcRecipe({ ...base, efficiency: null, ingredients: [ing({ name: "Mystery malt", type: "GRAIN", amount: 1, unit: "kg" })] });
     expect(r.og).toBeNull();
-    expect(r.warnings.join(" ")).toMatch(/Mystery malt/);
-    expect(r.warnings.join(" ")).toMatch(/72% efficiency is assumed/);
+    expect(r.warnings).toContainEqual({ key: "No potential set for {names} — left out of OG.", vars: { names: "Mystery malt" } });
+    expect(r.warnings).toContainEqual({ key: "No equipment profile, so {n}% efficiency is assumed.", vars: { n: 72 } });
   });
   it("computes actual brewhouse efficiency", () => {
     expect(brewhouseEfficiency(1.048, 20, [paleAle])).toBeCloseTo(72, 0);

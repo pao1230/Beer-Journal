@@ -5,21 +5,23 @@ import { IngredientTable } from "@/components/ingredient-table";
 import { StatusBadge } from "@/components/status-badge";
 import { Badge, Button, ButtonLink, Card, CardTitle, Empty, PageHeader, Stat } from "@/components/ui";
 import { db } from "@/lib/db";
-import { abv, batchLabel, fmtAbv, fmtDate, fmtNum, fmtSg, preBoilVolume } from "@/lib/brewing";
+import { abv, batchLabel, fmtAbv, fmtNum, fmtSg, preBoilVolume } from "@/lib/brewing";
 import { startBrew } from "@/app/brews/actions";
 import { deleteRecipe } from "../actions";
 import { CalcTable } from "@/components/calc-card";
 import { calcVersion, INGREDIENT_SPECS } from "@/lib/recipe-calc";
 import { fmtMoney, lineCost, shortfall } from "@/lib/inventory";
 import { loadStock } from "@/lib/inventory-data";
+import { getI18n } from "@/lib/i18n/server";
 
 export async function generateMetadata(props: PageProps<"/recipes/[id]">) {
   const id = Number((await props.params).id);
   const recipe = Number.isInteger(id) ? await db.recipe.findUnique({ where: { id }, select: { name: true } }) : null;
-  return { title: recipe?.name ?? "Recipe" };
+  return { title: recipe?.name ?? (await getI18n()).t("Recipe") };
 }
 
 export default async function RecipePage(props: PageProps<"/recipes/[id]">) {
+  const { t, date } = await getI18n();
   const id = Number((await props.params).id);
   const { v } = await props.searchParams;
   const recipe = Number.isInteger(id)
@@ -66,19 +68,19 @@ export default async function RecipePage(props: PageProps<"/recipes/[id]">) {
         subtitle={
           <>
             {recipe.style && <span>{recipe.style} · </span>}v{version.version}
-            {!isLatest && <Badge className="ml-2">Older version — latest is v{latest.version}</Badge>}
+            {!isLatest && <Badge className="ml-2">{t("Older version — latest is v{n}", { n: latest.version })}</Badge>}
           </>
         }
         actions={
           <>
             <ActionForm action={startBrew.bind(null, version.id)}>
-              <Button>{isLatest ? "🍺 Brew Again" : `Brew v${version.version}`}</Button>
+              <Button>{isLatest ? `🍺 ${t("Brew Again")}` : t("Brew v{n}", { n: version.version })}</Button>
             </ActionForm>
             <ButtonLink href={`/recipes/${recipe.id}/edit`} variant="secondary">
-              Edit
+              {t("Edit")}
             </ButtonLink>
             <ButtonLink href={`/recipes/${recipe.id}/scale${isLatest ? "" : `?v=${version.version}`}`} variant="secondary">
-              Scale
+              {t("Scale")}
             </ButtonLink>
           </>
         }
@@ -87,10 +89,10 @@ export default async function RecipePage(props: PageProps<"/recipes/[id]">) {
       <div className="grid gap-4 md:grid-cols-3">
         <div className="flex min-w-0 flex-col gap-4 md:col-span-2">
           <Card>
-            <CardTitle>Targets</CardTitle>
+            <CardTitle>{t("Targets")}</CardTitle>
             <div className="grid grid-cols-3 gap-4 sm:grid-cols-4">
-              <Stat label="Batch" value={fmtNum(version.batchSize, "L")} />
-              <Stat label="Boil" value={fmtNum(version.boilTime, "min")} />
+              <Stat label={t("Batch")} value={fmtNum(version.batchSize, "L")} />
+              <Stat label={t("Boil")} value={t("{n} min", { n: version.boilTime })} />
               <Stat label="OG" value={fmtSg(version.targetOg)} />
               <Stat label="FG" value={fmtSg(version.targetFg)} />
               <Stat label="ABV" value={fmtAbv(abv(version.targetOg, version.targetFg))} />
@@ -101,7 +103,7 @@ export default async function RecipePage(props: PageProps<"/recipes/[id]">) {
           </Card>
 
           <Card>
-            <CardTitle>Calculated from ingredients</CardTitle>
+            <CardTitle>{t("Calculated from ingredients")}</CardTitle>
             <CalcTable
               calc={calc}
               targets={{ og: version.targetOg, fg: version.targetFg, ibu: version.targetIbu, srm: version.targetSrm }}
@@ -109,7 +111,7 @@ export default async function RecipePage(props: PageProps<"/recipes/[id]">) {
           </Card>
 
           <Card>
-            <CardTitle>Ingredients</CardTitle>
+            <CardTitle>{t("Ingredients")}</CardTitle>
             <IngredientTable
               rows={version.ingredients.map((i) => ({
                 id: i.id,
@@ -130,9 +132,9 @@ export default async function RecipePage(props: PageProps<"/recipes/[id]">) {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <Card>
-              <CardTitle>Mash</CardTitle>
+              <CardTitle>{t("Mash")}</CardTitle>
               {version.mashSteps.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No mash steps.</p>
+                <p className="text-sm text-muted-foreground">{t("No mash steps.")}</p>
               ) : (
                 <ol className="flex flex-col gap-1 text-sm">
                   {version.mashSteps.map((m, idx) => (
@@ -141,7 +143,7 @@ export default async function RecipePage(props: PageProps<"/recipes/[id]">) {
                         {idx + 1}. {m.name}
                       </span>
                       <span className="tabular-nums">
-                        {m.temperature}°C · {m.timeMin} min
+                        {m.temperature}°C · {t("{n} min", { n: m.timeMin })}
                       </span>
                     </li>
                   ))}
@@ -149,19 +151,19 @@ export default async function RecipePage(props: PageProps<"/recipes/[id]">) {
               )}
             </Card>
             <Card>
-              <CardTitle>Water & volumes</CardTitle>
+              <CardTitle>{t("Water & volumes")}</CardTitle>
               <dl className="grid grid-cols-2 gap-y-1 text-sm">
-                <dt className="text-muted-foreground">Source</dt>
+                <dt className="text-muted-foreground">{t("Source")}</dt>
                 <dd>{version.waterSource ?? "–"}</dd>
-                <dt className="text-muted-foreground">Mash water</dt>
+                <dt className="text-muted-foreground">{t("Mash water")}</dt>
                 <dd>{fmtNum(version.mashWaterL, "L")}</dd>
-                <dt className="text-muted-foreground">Sparge water</dt>
+                <dt className="text-muted-foreground">{t("Sparge water")}</dt>
                 <dd>{fmtNum(version.spargeWaterL, "L")}</dd>
-                <dt className="text-muted-foreground">Target mash pH</dt>
+                <dt className="text-muted-foreground">{t("Target mash pH")}</dt>
                 <dd>{fmtNum(version.targetMashPh)}</dd>
-                <dt className="text-muted-foreground">Est. pre-boil</dt>
+                <dt className="text-muted-foreground">{t("Est. pre-boil")}</dt>
                 <dd>{preBoil == null ? "–" : `${preBoil.toFixed(1)} L`}</dd>
-                <dt className="text-muted-foreground">Equipment</dt>
+                <dt className="text-muted-foreground">{t("Equipment")}</dt>
                 <dd>{version.equipmentProfile?.name ?? "–"}</dd>
               </dl>
             </Card>
@@ -169,7 +171,7 @@ export default async function RecipePage(props: PageProps<"/recipes/[id]">) {
 
           {(recipe.notes || version.notes) && (
             <Card>
-              <CardTitle>Notes</CardTitle>
+              <CardTitle>{t("Notes")}</CardTitle>
               {recipe.notes && <p className="text-sm whitespace-pre-wrap">{recipe.notes}</p>}
               {version.notes && (
                 <p className="mt-2 text-sm text-muted-foreground">
@@ -186,15 +188,15 @@ export default async function RecipePage(props: PageProps<"/recipes/[id]">) {
               action={
                 recipe.sessions.length >= 2 && (
                   <Link className="text-sm underline" href={`/compare?recipe=${recipe.id}`}>
-                    Compare
+                    {t("Compare")}
                   </Link>
                 )
               }
             >
-              Brews
+              {t("Brews")}
             </CardTitle>
             {recipe.sessions.length === 0 ? (
-              <Empty>Not brewed yet.</Empty>
+              <Empty>{t("Not brewed yet.")}</Empty>
             ) : (
               <ul className="divide-y divide-border text-sm">
                 {recipe.sessions.map((s) => (
@@ -205,7 +207,7 @@ export default async function RecipePage(props: PageProps<"/recipes/[id]">) {
                         <StatusBadge status={s.status} />
                       </span>
                       <span className="text-xs text-muted-foreground">
-                        {fmtDate(s.brewDate)} · v{s.recipeVersion.version} · OG {fmtSg(s.actualOg)} · FG {fmtSg(s.actualFg)}
+                        {date(s.brewDate)} · v{s.recipeVersion.version} · OG {fmtSg(s.actualOg)} · FG {fmtSg(s.actualFg)}
                       </span>
                     </Link>
                   </li>
@@ -215,24 +217,27 @@ export default async function RecipePage(props: PageProps<"/recipes/[id]">) {
           </Card>
 
           <Card>
-            <CardTitle>Cost & stock</CardTitle>
+            <CardTitle>{t("Cost & stock")}</CardTitle>
             <div className="text-sm">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Est. cost per batch</span>
+                <span className="text-muted-foreground">{t("Est. cost per batch")}</span>
                 <strong className="tabular-nums">{unpriced === version.ingredients.length ? "–" : fmtMoney(totalCost)}</strong>
               </div>
               {unpriced > 0 && unpriced < version.ingredients.length && (
-                <p className="text-xs text-muted-foreground">{unpriced} ingredient(s) have no purchase price yet.</p>
+                <p className="text-xs text-muted-foreground">{t("{n} ingredient(s) have no purchase price yet.", { n: unpriced })}</p>
               )}
               {untracked === version.ingredients.length ? (
                 <p className="mt-2 text-xs text-muted-foreground">
-                  No stock tracked. <Link className="underline" href="/inventory">Set up inventory</Link>
+                  {t("No stock tracked.")}{" "}
+                  <Link className="underline" href="/inventory">
+                    {t("Set up inventory")}
+                  </Link>
                 </p>
               ) : short.length === 0 ? (
-                <p className="mt-2">✅ Enough in stock{untracked > 0 ? ` (${untracked} untracked)` : ""}</p>
+                <p className="mt-2">✅ {t("Enough in stock")}{untracked > 0 ? ` (${t("{n} untracked", { n: untracked })})` : ""}</p>
               ) : (
                 <>
-                  <p className="mt-2 font-medium">⚠️ Short for this batch:</p>
+                  <p className="mt-2 font-medium">⚠️ {t("Short for this batch:")}</p>
                   <ul className="mt-1 flex flex-col gap-0.5">
                     {short.map((s) => (
                       <li key={s.id} className="flex justify-between gap-2">
@@ -247,7 +252,7 @@ export default async function RecipePage(props: PageProps<"/recipes/[id]">) {
           </Card>
 
           <Card>
-            <CardTitle>Versions</CardTitle>
+            <CardTitle>{t("Versions")}</CardTitle>
             <ul className="flex flex-col gap-1 text-sm">
               {recipe.versions.map((rv) => (
                 <li key={rv.id}>
@@ -255,7 +260,7 @@ export default async function RecipePage(props: PageProps<"/recipes/[id]">) {
                     href={`/recipes/${recipe.id}?v=${rv.version}`}
                     className={`block rounded px-2 py-1 hover:bg-muted ${rv.id === version.id ? "bg-muted font-semibold" : ""}`}
                   >
-                    v{rv.version} · {fmtDate(rv.createdAt)} · {rv._count.sessions} brew(s)
+                    v{rv.version} · {date(rv.createdAt)} · {t("{n} brew(s)", { n: rv._count.sessions })}
                     {rv.notes && <span className="block text-xs font-normal text-muted-foreground">{rv.notes}</span>}
                   </Link>
                 </li>
@@ -264,9 +269,9 @@ export default async function RecipePage(props: PageProps<"/recipes/[id]">) {
           </Card>
 
           {recipe.sessions.length === 0 && (
-            <ActionForm action={deleteRecipe.bind(null, recipe.id)} confirm={`Delete ${recipe.name} and all its versions?`}>
+            <ActionForm action={deleteRecipe.bind(null, recipe.id)} confirm={t("Delete {name} and all its versions?", { name: recipe.name })}>
               <Button variant="danger" className="w-full">
-                Delete recipe
+                {t("Delete recipe")}
               </Button>
             </ActionForm>
           )}

@@ -4,10 +4,15 @@ import { db } from "@/lib/db";
 import { updateRecipe } from "../../actions";
 import { editorOptions } from "../../editor-data";
 import { RecipeEditor } from "../../recipe-editor";
+import { getI18n } from "@/lib/i18n/server";
 
-export const metadata = { title: "Edit recipe" };
+export async function generateMetadata() {
+  const { t } = await getI18n();
+  return { title: t("Edit recipe") };
+}
 
 export default async function EditRecipePage(props: PageProps<"/recipes/[id]/edit">) {
+  const { t } = await getI18n();
   const id = Number((await props.params).id);
   const recipe = Number.isInteger(id)
     ? await db.recipe.findUnique({
@@ -33,7 +38,7 @@ export default async function EditRecipePage(props: PageProps<"/recipes/[id]/edi
 
   return (
     <>
-      <PageHeader title={`Edit ${recipe.name}`} subtitle={`Currently v${latest.version}`} />
+      <PageHeader title={t("Edit {name}", { name: recipe.name })} subtitle={t("Currently v{n}", { n: latest.version })} />
       <RecipeEditor
         action={updateRecipe.bind(null, id)}
         ingredients={ingredients}

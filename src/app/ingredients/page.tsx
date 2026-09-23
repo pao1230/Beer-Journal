@@ -4,8 +4,12 @@ import { db } from "@/lib/db";
 import { INGREDIENT_TYPES, labelOf } from "@/lib/brewing";
 import type { Prisma } from "@/generated/prisma/client";
 import type { IngredientType } from "@/generated/prisma/enums";
+import { getI18n } from "@/lib/i18n/server";
 
-export const metadata = { title: "Ingredients" };
+export async function generateMetadata() {
+  const { t } = await getI18n();
+  return { title: t("Ingredients") };
+}
 
 function specs(i: {
   color: number | null;
@@ -26,9 +30,10 @@ function specs(i: {
 }
 
 export default async function IngredientsPage(props: PageProps<"/ingredients">) {
+  const { t } = await getI18n();
   const sp = await props.searchParams;
   const q = typeof sp.q === "string" ? sp.q.trim() : "";
-  const type = INGREDIENT_TYPES.find((t) => t.value === sp.type)?.value as IngredientType | undefined;
+  const type = INGREDIENT_TYPES.find((x) => x.value === sp.type)?.value as IngredientType | undefined;
   const showArchived = sp.archived === "1";
 
   const where: Prisma.IngredientWhereInput = {
@@ -47,41 +52,44 @@ export default async function IngredientsPage(props: PageProps<"/ingredients">) 
   return (
     <>
       <PageHeader
-        title="Ingredients"
+        title={t("Ingredients")}
         actions={
           <>
             <ButtonLink href="/inventory" variant="secondary">
-              Inventory
+              {t("Inventory")}
             </ButtonLink>
-            <ButtonLink href={`/ingredients/new${type ? `?type=${type}` : ""}`}>+ New ingredient</ButtonLink>
+            <ButtonLink href={`/ingredients/new${type ? `?type=${type}` : ""}`}>{t("+ New ingredient")}</ButtonLink>
           </>
         }
       />
       <form className="mb-4 flex flex-wrap gap-2">
-        <Input name="q" defaultValue={q} placeholder="Search name, brand, supplier" className="max-w-xs" />
+        <Input name="q" defaultValue={q} placeholder={t("Search name, brand, supplier")} className="max-w-xs" />
         <Select name="type" defaultValue={type ?? ""} className="w-auto">
-          <option value="">All types</option>
-          {INGREDIENT_TYPES.map((t) => (
-            <option key={t.value} value={t.value}>
-              {t.label}
+          <option value="">{t("All types")}</option>
+          {INGREDIENT_TYPES.map((x) => (
+            <option key={x.value} value={x.value}>
+              {t(x.label)}
             </option>
           ))}
         </Select>
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" name="archived" value="1" defaultChecked={showArchived} /> Show archived
+          <input type="checkbox" name="archived" value="1" defaultChecked={showArchived} /> {t("Show archived")}
         </label>
-        <button className="rounded-md border border-border px-3 text-sm hover:bg-muted">Filter</button>
+        <button className="rounded-md border border-border px-3 text-sm hover:bg-muted">{t("Filter")}</button>
       </form>
 
-      {INGREDIENT_TYPES.filter((t) => !type || t.value === type).map((t) => {
-        const rows = ingredients.filter((i) => i.type === t.value);
+      {INGREDIENT_TYPES.filter((x) => !type || x.value === type).map((x) => {
+        const rows = ingredients.filter((i) => i.type === x.value);
         if (rows.length === 0 && (type || q)) return null;
         return (
-          <Card key={t.value} className="mb-4">
-            <h2 className="mb-2 font-semibold">{labelOf(INGREDIENT_TYPES, t.value)}</h2>
+          <Card key={x.value} className="mb-4">
+            <h2 className="mb-2 font-semibold">{t(labelOf(INGREDIENT_TYPES, x.value))}</h2>
             {rows.length === 0 ? (
               <Empty>
-                None yet. <Link className="underline" href={`/ingredients/new?type=${t.value}`}>Add one</Link>
+                {t("None yet.")}{" "}
+                <Link className="underline" href={`/ingredients/new?type=${x.value}`}>
+                  {t("Add one")}
+                </Link>
               </Empty>
             ) : (
               <ul className="divide-y divide-border">
@@ -94,7 +102,7 @@ export default async function IngredientsPage(props: PageProps<"/ingredients">) 
                       <span className="font-medium">{i.name}</span>
                       {i.brand && <span className="text-sm text-muted-foreground">{i.brand}</span>}
                       <span className="text-xs text-muted-foreground">{specs(i)}</span>
-                      {i.isArchived && <Badge>Archived</Badge>}
+                      {i.isArchived && <Badge>{t("Archived")}</Badge>}
                     </Link>
                   </li>
                 ))}
@@ -103,7 +111,7 @@ export default async function IngredientsPage(props: PageProps<"/ingredients">) 
           </Card>
         );
       })}
-      {ingredients.length === 0 && (type || q) && <Empty>No ingredients match.</Empty>}
+      {ingredients.length === 0 && (type || q) && <Empty>{t("No ingredients match.")}</Empty>}
     </>
   );
 }
