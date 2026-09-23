@@ -5,8 +5,14 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { run } from "@/lib/action";
 import { num, required, str, type ActionState } from "@/lib/form";
-import { INGREDIENT_TYPES } from "@/lib/brewing";
+import { INGREDIENT_TYPES, UNITS } from "@/lib/brewing";
+import { WATER_SALTS } from "@/lib/calc";
 import type { IngredientType } from "@/generated/prisma/enums";
+
+function oneOf(value: string | null, allowed: string[], name: string) {
+  if (value != null && !allowed.includes(value)) throw new Error(`Unknown ${name}`);
+  return value;
+}
 
 function parse(fd: FormData) {
   const type = str(fd, "type") as IngredientType | null;
@@ -19,11 +25,14 @@ function parse(fd: FormData) {
     supplier: str(fd, "supplier"),
     notes: str(fd, "notes"),
     color: pick(["GRAIN"], num(fd, "color")),
-    potential: pick(["GRAIN"], num(fd, "potential")),
+    potential: pick(["GRAIN", "OTHER"], num(fd, "potential")),
+    unfermentable: type === "OTHER" && fd.get("unfermentable") === "on",
     alphaAcid: pick(["HOP"], num(fd, "alphaAcid")),
     form: pick(["HOP", "YEAST"], str(fd, "form")),
     attenuation: pick(["YEAST"], num(fd, "attenuation")),
     flocculation: pick(["YEAST"], str(fd, "flocculation")),
+    waterSalt: pick(["WATER"], oneOf(str(fd, "waterSalt"), Object.keys(WATER_SALTS), "Water salt")),
+    stockUnit: oneOf(str(fd, "stockUnit"), UNITS, "Stock unit"),
   };
 }
 

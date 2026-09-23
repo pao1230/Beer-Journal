@@ -1,0 +1,75 @@
+import Link from "next/link";
+import { Badge, ButtonLink, Card, Empty, PageHeader } from "@/components/ui";
+import { db } from "@/lib/db";
+import { fmtNum, INGREDIENT_TYPES, labelOf } from "@/lib/brewing";
+import { fmtMoney } from "@/lib/inventory";
+import { loadStock } from "@/lib/inventory-data";
+
+export const metadata = { title: "Inventory" };
+
+export default async function InventoryPage() {
+  const [ingredients, stock] = await Promise.all([
+    db.ingredient.findMany({
+      where: { stockUnit: { not: null } },
+      orderBy: [{ type: "asc" }, { name: "asc" }],
+      select: { id: true, name: true, type: true, brand: true, isArchived: true },
+    }),
+    loadStock(),
+  ]);
+  const rows = ingredients
+    .map((i) => ({ ...i, stock: stock.get(i.id)! }))
+    .filter((r) => !r.isArchived || r.stock.onHand !== 0);
+  const totalValue = rows.reduce((sum, r) => sum + (r.stock.avgCost == null ? 0 : Math.max(0, r.stock.onHand) * r.stock.avgCost), 0);
+
+  return (
+    <>
+      <PageHeader
+        title="Inventory"
+        subtitle={`Stock on hand, valued at average purchase cost: ${fmtMoney(totalValue)}`}
+        actions={<ButtonLink href="/ingredients" variant="secondary">Ingredients</ButtonLink>}
+      />
+      <Card>
+        {rows.length === 0 ? (
+          <Empty>No ingredients are tracked yet. Set an inventory unit on an ingredient, then add a purchase.</Empty>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[28rem] text-sm tabular-nums">
+              <thead className="text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="py-1 pr-3 font-medium">Ingredient</th>
+                  <th className="py-1 pr-3 font-medium">Type</th>
+                  <th className="py-1 pr-3 text-right font-medium">In stock</th>
+                  <th className="py-1 pr-3 text-right font-medium">Avg cost</th>
+                  <th className="py-1 text-right font-medium">Value</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {rows.map((r) => (
+                  <tr key={r.id}>
+                    <td className="py-2 pr-3">
+                      <Link href={`/ingredients/${r.id}/edit`} className="font-medium underline">
+                        {r.name}
+                      </Link>
+                      {r.brand && <span className="ml-2 text-xs text-muted-foreground">{r.brand}</span>}
+                    </td>
+                    <td className="py-2 pr-3 text-muted-foreground">{labelOf(INGREDIENT_TYPES, r.type)}</td>
+                    <td className="py-2 pr-3 text-right">
+                      {r.stock.onHand <= 0 && <Badge className="mr-2 bg-warning-bg">⚠️ Out</Badge>}
+                      {fmtNum(Number(r.stock.onHand.toFixed(3)), r.stock.stockUnit!)}
+                    </td>
+                    <td className="py-2 pr-3 text-right">
+                      {r.stock.avgCost == null ? "–" : `${fmtMoney(r.stock.avgCost)}/${r.stock.stockUnit}`}
+                    </td>
+                    <td className="py-2 text-right">
+                      {r.stock.avgCost == null ? "–" : fmtMoney(Math.max(0, r.stock.onHand) * r.stock.avgCost)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </>
+  );
+}

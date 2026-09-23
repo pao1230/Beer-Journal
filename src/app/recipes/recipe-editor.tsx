@@ -5,6 +5,8 @@ import { Trash2, ArrowUp, ArrowDown } from "lucide-react";
 import { ActionForm } from "@/components/action-form";
 import { Button, ButtonLink, Card, CardTitle, Field, Input, Select, Textarea } from "@/components/ui";
 import { abv, DEFAULT_STAGE, fmtAbv, INGREDIENT_TYPES, STAGES, UNITS } from "@/lib/brewing";
+import { calcRecipe } from "@/lib/calc";
+import { CalcTable } from "@/components/calc-card";
 import type { ActionState } from "@/lib/form";
 import type { AdditionStage, IngredientType } from "@/generated/prisma/enums";
 
@@ -14,6 +16,12 @@ export type PickerIngredient = {
   type: IngredientType;
   brand: string | null;
   isArchived: boolean;
+  potential: number | null;
+  waterSalt: string | null;
+  alphaAcid: number | null;
+  color: number | null;
+  attenuation: number | null;
+  unfermentable: boolean;
 };
 
 export type IngredientRow = {
@@ -73,7 +81,7 @@ export function RecipeEditor({
   action: (prev: ActionState, fd: FormData) => Promise<ActionState>;
   initial: RecipeInitial;
   ingredients: PickerIngredient[];
-  equipment: { id: number; name: string; batchSize: number }[];
+  equipment: { id: number; name: string; batchSize: number; efficiency: number; trubLoss: number }[];
   versionInfo?: { current: number; brewed: boolean };
   cancelHref: string;
 }) {
@@ -81,6 +89,12 @@ export function RecipeEditor({
   const [mash, setMash] = useState<MashRow[]>(initial.mashSteps);
   const [og, setOg] = useState(v(initial.targetOg));
   const [fg, setFg] = useState(v(initial.targetFg));
+  const [batchSize, setBatchSize] = useState(v(initial.batchSize));
+  const [equipmentId, setEquipmentId] = useState(v(initial.equipmentProfileId));
+  const [ibu, setIbu] = useState(v(initial.targetIbu));
+  const [srm, setSrm] = useState(v(initial.targetSrm));
+  const [mashWater, setMashWater] = useState(v(initial.mashWaterL));
+  const [spargeWater, setSpargeWater] = useState(v(initial.spargeWaterL));
   const [pickType, setPickType] = useState<IngredientType>("GRAIN");
   const [pickId, setPickId] = useState("");
   const [pickAmount, setPickAmount] = useState("");
@@ -88,6 +102,21 @@ export function RecipeEditor({
   const byId = useMemo(() => new Map(ingredients.map((i) => [i.id, i])), [ingredients]);
   const pickable = ingredients.filter((i) => i.type === pickType && !i.isArchived);
   const targetAbv = abv(toNum(og), toNum(fg));
+  const selectedEquipment = equipment.find((e) => String(e.id) === equipmentId) ?? null;
+  const calc = calcRecipe({
+    batchSize: toNum(batchSize) ?? 0,
+    targetOg: toNum(og),
+    efficiency: selectedEquipment?.efficiency ?? null,
+    trubLoss: selectedEquipment?.trubLoss ?? null,
+    mashWaterL: toNum(mashWater),
+    spargeWaterL: toNum(spargeWater),
+    ingredients: rows.flatMap((r) => {
+      const ing = byId.get(r.ingredientId);
+      const amount = toNum(r.amount);
+      if (!ing || amount == null) return [];
+      return [{ ...ing, amount, unit: r.unit, stage: r.stage, additionTime: toNum(r.additionTime) }];
+    }),
+  });
 
   function addRow() {
     const id = Number(pickId || pickable[0]?.id);
@@ -151,7 +180,7 @@ export function RecipeEditor({
             <Input name="style" defaultValue={initial.style} placeholder="Sweet Stout" />
           </Field>
           <Field label="Equipment profile">
-            <Select name="equipmentProfileId" defaultValue={v(initial.equipmentProfileId)}>
+            <Select name="equipmentProfileId" value={equipmentId} onChange={(e) => setEquipmentId(e.target.value)}>
               <option value="">None</option>
               {equipment.map((e) => (
                 <option key={e.id} value={e.id}>
@@ -162,7 +191,7 @@ export function RecipeEditor({
           </Field>
           <div className="grid grid-cols-2 gap-4">
             <Field label="Batch size (L)">
-              <Input name="batchSize" type="number" step="0.1" min="0" required defaultValue={v(initial.batchSize)} />
+              <Input name="batchSize" type="number" step="0.1" min="0" required value={batchSize} onChange={(e) => setBatchSize(e.target.value)} />
             </Field>
             <Field label="Boil time (min)">
               <Input name="boilTime" type="number" step="1" min="0" defaultValue={initial.boilTime} />
@@ -184,10 +213,10 @@ export function RecipeEditor({
             <div className="flex min-h-10 items-center text-sm font-semibold">{fmtAbv(targetAbv)}</div>
           </Field>
           <Field label="IBU">
-            <Input name="targetIbu" type="number" step="1" min="0" defaultValue={v(initial.targetIbu)} />
+            <Input name="targetIbu" type="number" step="1" min="0" value={ibu} onChange={(e) => setIbu(e.target.value)} />
           </Field>
           <Field label="SRM">
-            <Input name="targetSrm" type="number" step="1" min="0" defaultValue={v(initial.targetSrm)} />
+            <Input name="targetSrm" type="number" step="1" min="0" value={srm} onChange={(e) => setSrm(e.target.value)} />
           </Field>
           <Field label="Carbonation (vol CO2)">
             <Input name="targetCarbonation" type="number" step="0.1" min="0" defaultValue={v(initial.targetCarbonation)} />
@@ -301,6 +330,11 @@ export function RecipeEditor({
       </Card>
 
       <Card>
+        <CardTitle>Calculated (live)</CardTitle>
+        <CalcTable calc={calc} targets={{ og: toNum(og), fg: toNum(fg), ibu: toNum(ibu), srm: toNum(srm) }} />
+      </Card>
+
+      <Card>
         <CardTitle
           action={
             <Button
@@ -342,10 +376,10 @@ export function RecipeEditor({
             </Select>
           </Field>
           <Field label="Mash water (L)">
-            <Input name="mashWaterL" type="number" step="0.1" min="0" defaultValue={v(initial.mashWaterL)} />
+            <Input name="mashWaterL" type="number" step="0.1" min="0" value={mashWater} onChange={(e) => setMashWater(e.target.value)} />
           </Field>
           <Field label="Sparge water (L)">
-            <Input name="spargeWaterL" type="number" step="0.1" min="0" defaultValue={v(initial.spargeWaterL)} />
+            <Input name="spargeWaterL" type="number" step="0.1" min="0" value={spargeWater} onChange={(e) => setSpargeWater(e.target.value)} />
           </Field>
           <Field label="Target mash pH">
             <Input name="targetMashPh" type="number" step="0.01" min="0" max="14" defaultValue={v(initial.targetMashPh)} />

@@ -34,6 +34,12 @@ enum BrewStatus {
   CANCELLED
 }
 
+enum InventoryReason {
+  PURCHASE
+  ADJUSTMENT
+  BREW
+}
+
 enum StepType {
   WATER_PREP
   MASHING
@@ -60,11 +66,18 @@ model Ingredient {
   form         String? // hop: pellet/leaf/cryo · yeast: dry/liquid
   attenuation  Float? // %
   flocculation String?
+  // Sugars/lactose: true when yeast can't ferment it (stays in FG)
+  unfermentable Boolean       @default(false)
+  // Water agent: which salt, for the water-profile calculator (CaCl2, CaSO4, MgSO4, NaHCO3, CaCO3, NaCl)
+  waterSalt    String?
+  // Inventory is tracked in this unit; stock and cost come from InventoryTransaction.
+  stockUnit    String?
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 
   recipeIngredients RecipeIngredient[]
   brewIngredients   BrewIngredient[]
+  inventory         InventoryTransaction[]
 
   @@index([type, isArchived])
 }
@@ -182,6 +195,7 @@ model BrewSession {
   steps       BrewStep[]
   problems    Problem[]
   lessons     Lesson[]
+  inventory   InventoryTransaction[]
 
   @@unique([recipeId, batchNumber])
   @@index([brewDate])
@@ -217,6 +231,7 @@ model BrewStep {
   measurements    Measurement[]
   problems        Problem[]
   fermentationLog FermentationLog[]
+  photos          Photo[]
 
   @@unique([brewSessionId, type])
 }
@@ -274,6 +289,39 @@ model FermentationLog {
   ph          Float?
   activity    String?
   notes       String?
+
+  @@index([brewStepId])
+}
+
+/// Stock ledger: stock = sum(amount); average cost = purchase cost / purchased amount.
+model InventoryTransaction {
+  id            Int             @id @default(autoincrement())
+  ingredientId  Int
+  ingredient    Ingredient      @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  amount        Float // in ingredient.stockUnit; positive = in, negative = out
+  totalCost     Float? // purchases only
+  reason        InventoryReason
+  // Deleting a brew removes its deductions, which puts the stock back.
+  brewSessionId Int?
+  brewSession   BrewSession?    @relation(fields: [brewSessionId], references: [id], onDelete: Cascade)
+  note          String?
+  createdAt     DateTime        @default(now())
+
+  @@index([ingredientId])
+  @@index([brewSessionId])
+}
+
+/// Stored in the database (resized client-side) so the app needs no external file storage.
+model Photo {
+  id         Int      @id @default(autoincrement())
+  brewStepId Int
+  brewStep   BrewStep @relation(fields: [brewStepId], references: [id], onDelete: Cascade)
+  mimeType   String
+  data       Bytes
+  width      Int?
+  height     Int?
+  caption    String?
+  createdAt  DateTime @default(now())
 
   @@index([brewStepId])
 }

@@ -1,8 +1,11 @@
 import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient, type AdditionStage, type IngredientType } from "../src/generated/prisma/client";
+import { convertUnit } from "../src/lib/calc";
 
 const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) });
+
+const STOCK_UNIT: Record<IngredientType, string> = { GRAIN: "kg", HOP: "g", YEAST: "pkg", WATER: "g", OTHER: "g" };
 
 const STEP_TYPES = ["WATER_PREP", "MASHING", "SPARGING", "BOILING", "COOLING", "FERMENTATION", "PACKAGING"] as const;
 
@@ -19,8 +22,8 @@ async function main() {
   const ing = async (
     name: string,
     type: IngredientType,
-    extra: Partial<{ brand: string; color: number; potential: number; alphaAcid: number; form: string; attenuation: number; flocculation: string }> = {},
-  ) => db.ingredient.create({ data: { name, type, ...extra } });
+    extra: Partial<{ brand: string; color: number; potential: number; alphaAcid: number; form: string; attenuation: number; flocculation: string; waterSalt: string; unfermentable: boolean }> = {},
+  ) => db.ingredient.create({ data: { name, type, stockUnit: STOCK_UNIT[type], ...extra } });
 
   const paleAle = await ing("Pale Ale Malt", "GRAIN", { brand: "Simpsons", color: 3, potential: 1.038 });
   const roasted = await ing("Roasted Barley", "GRAIN", { color: 500, potential: 1.025 });
@@ -33,12 +36,31 @@ async function main() {
   const us05 = await ing("Safale US-05", "YEAST", { brand: "Fermentis", attenuation: 81, form: "Dry", flocculation: "Medium" });
   await ing("Saflager W-34/70", "YEAST", { brand: "Fermentis", attenuation: 83, form: "Dry", flocculation: "High" });
   await ing("Safale S-04", "YEAST", { brand: "Fermentis", attenuation: 75, form: "Dry", flocculation: "High" });
-  const lactose = await ing("Lactose", "OTHER");
+  const lactose = await ing("Lactose", "OTHER", { potential: 1.035, unfermentable: true });
   const nutrient = await ing("Yeast Nutrient", "OTHER");
   await ing("Irish Moss", "OTHER");
-  const nahco3 = await ing("Sodium Bicarbonate (NaHCO3)", "WATER");
-  const cacl2 = await ing("Calcium Chloride (CaCl2)", "WATER");
-  const caco3 = await ing("Calcium Carbonate (CaCO3)", "WATER");
+  const nahco3 = await ing("Sodium Bicarbonate (NaHCO3)", "WATER", { waterSalt: "NaHCO3" });
+  const cacl2 = await ing("Calcium Chloride (CaCl2)", "WATER", { waterSalt: "CaCl2" });
+  const caco3 = await ing("Calcium Carbonate (CaCO3)", "WATER", { waterSalt: "CaCO3" });
+
+  // Purchases in THB so batch cost and stock checks have something to show.
+  const buy = (i: { id: number }, amount: number, totalCost: number) => ({ ingredientId: i.id, amount, totalCost, reason: "PURCHASE" as const, note: "Brew Shop A" });
+  await db.inventoryTransaction.createMany({
+    data: [
+      buy(paleAle, 25, 1750),
+      buy(roasted, 1, 120),
+      buy(caradis, 1, 130),
+      buy(carafa, 1, 150),
+      buy(oats, 1, 90),
+      buy(magnum, 100, 350),
+      buy(ekg, 100, 320),
+      buy(us05, 3, 450),
+      buy(lactose, 1000, 150),
+      buy(nahco3, 500, 60),
+      buy(cacl2, 500, 80),
+      buy(caco3, 500, 60),
+    ],
+  });
 
   const line = (
     i: { id: number; name: string; brand: string | null; alphaAcid: number | null; color: number | null; attenuation: number | null },
@@ -61,6 +83,7 @@ async function main() {
     sortOrder,
   });
 
+  const stockUnitOf = new Map((await db.ingredient.findMany({ select: { id: true, stockUnit: true } })).map((i) => [i.id, i.stockUnit!]));
   const lines = [
     line(paleAle, 4.2, "kg", "MASH", null, 0),
     line(roasted, 500, "g", "MASH", null, 1),
@@ -89,8 +112,8 @@ async function main() {
           boilTime: 60,
           targetOg: 1.074,
           targetFg: 1.026,
-          targetIbu: 28,
-          targetSrm: 38,
+          targetIbu: 40,
+          targetSrm: 45,
           targetCarbonation: 2.2,
           waterSource: "RO",
           mashWaterL: 17.8,
@@ -198,7 +221,14 @@ async function main() {
     ],
   });
 
-  console.log("Seeded Sweet Stout recipe, brew #001, and starter ingredients.");
+  await db.inventoryTransaction.createMany({
+    data: lines.flatMap((l) => {
+      const amount = convertUnit(l.amount, l.unit, stockUnitOf.get(l.ingredientId)!);
+      return amount == null ? [] : [{ ingredientId: l.ingredientId, amount: -amount, reason: "BREW" as const, brewSessionId: session.id }];
+    }),
+  });
+
+  console.log("Seeded Sweet Stout recipe, brew #001, starter ingredients and inventory.");
 }
 
 main()

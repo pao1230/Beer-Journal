@@ -8,6 +8,10 @@ import { db } from "@/lib/db";
 import { abv, batchLabel, fmtAbv, fmtDate, fmtNum, fmtSg, preBoilVolume } from "@/lib/brewing";
 import { startBrew } from "@/app/brews/actions";
 import { deleteRecipe } from "../actions";
+import { CalcTable } from "@/components/calc-card";
+import { calcVersion, INGREDIENT_SPECS } from "@/lib/recipe-calc";
+import { fmtMoney, lineCost, shortfall } from "@/lib/inventory";
+import { loadStock } from "@/lib/inventory-data";
 
 export async function generateMetadata(props: PageProps<"/recipes/[id]">) {
   const id = Number((await props.params).id);
@@ -38,10 +42,20 @@ export default async function RecipePage(props: PageProps<"/recipes/[id]">) {
     where: { id: selectedMeta.id },
     include: {
       equipmentProfile: true,
-      ingredients: { orderBy: { sortOrder: "asc" } },
+      ingredients: { orderBy: { sortOrder: "asc" }, include: { ingredient: INGREDIENT_SPECS } },
       mashSteps: { orderBy: { stepOrder: "asc" } },
     },
   });
+  const calc = calcVersion(version);
+  const stock = await loadStock([...new Set(version.ingredients.map((i) => i.ingredientId))]);
+  const costs = version.ingredients.map((i) => lineCost(i.amount, i.unit, stock.get(i.ingredientId)));
+  const unpriced = costs.filter((c) => c == null).length;
+  const totalCost = costs.reduce<number>((sum, c) => sum + (c ?? 0), 0);
+  const short = version.ingredients.flatMap((i) => {
+    const missing = shortfall(i.amount, i.unit, stock.get(i.ingredientId));
+    return missing ? [{ id: i.id, name: i.nameSnapshot, missing, unit: i.unit }] : [];
+  });
+  const untracked = version.ingredients.filter((i) => !stock.get(i.ingredientId)?.stockUnit).length;
   const isLatest = version.id === latest.id;
   const preBoil = preBoilVolume(version.batchSize, version.boilTime, version.equipmentProfile);
 
@@ -84,6 +98,14 @@ export default async function RecipePage(props: PageProps<"/recipes/[id]">) {
               <Stat label="SRM" value={fmtNum(version.targetSrm)} />
               <Stat label="CO2" value={fmtNum(version.targetCarbonation, "vol")} />
             </div>
+          </Card>
+
+          <Card>
+            <CardTitle>Calculated from ingredients</CardTitle>
+            <CalcTable
+              calc={calc}
+              targets={{ og: version.targetOg, fg: version.targetFg, ibu: version.targetIbu, srm: version.targetSrm }}
+            />
           </Card>
 
           <Card>
@@ -190,6 +212,38 @@ export default async function RecipePage(props: PageProps<"/recipes/[id]">) {
                 ))}
               </ul>
             )}
+          </Card>
+
+          <Card>
+            <CardTitle>Cost & stock</CardTitle>
+            <div className="text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Est. cost per batch</span>
+                <strong className="tabular-nums">{unpriced === version.ingredients.length ? "–" : fmtMoney(totalCost)}</strong>
+              </div>
+              {unpriced > 0 && unpriced < version.ingredients.length && (
+                <p className="text-xs text-muted-foreground">{unpriced} ingredient(s) have no purchase price yet.</p>
+              )}
+              {untracked === version.ingredients.length ? (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  No stock tracked. <Link className="underline" href="/inventory">Set up inventory</Link>
+                </p>
+              ) : short.length === 0 ? (
+                <p className="mt-2">✅ Enough in stock{untracked > 0 ? ` (${untracked} untracked)` : ""}</p>
+              ) : (
+                <>
+                  <p className="mt-2 font-medium">⚠️ Short for this batch:</p>
+                  <ul className="mt-1 flex flex-col gap-0.5">
+                    {short.map((s) => (
+                      <li key={s.id} className="flex justify-between gap-2">
+                        <span>{s.name}</span>
+                        <span className="tabular-nums">{fmtNum(Number(s.missing.toFixed(3)), s.unit)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
           </Card>
 
           <Card>

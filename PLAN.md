@@ -1,7 +1,18 @@
 # 🍺 Brewing Journal Web App — Plan (v2)
 
-> **Status:** Phase 1 and Phase 2 are implemented (see [README](README.md)). Next up is Phase 3
-> (§29: cost, inventory, calculators, export, photos).
+> **Status:** Phases 1–3 are implemented (see [README](README.md)).
+>
+> Phase 3 notes:
+> - **Inventory** is a ledger (`InventoryTransaction`: purchase / stock count / brew), so stock
+>   and weighted-average cost are always derived, and deducting a brew can be undone. Brew
+>   deduction is an explicit button, not automatic on status change.
+> - **Calculators**: Tinseth IBU (OG as boil gravity, post-boil volume), Morey SRM, OG from
+>   grain potential × equipment efficiency; sugars/lactose ("Other" with a potential) count at
+>   100% and can be marked unfermentable. Water ppm assumes RO/distilled base water.
+> - **PDF export** is a print-optimised report saved via the browser, not a server-side PDF
+>   library — those don't shape Thai text correctly.
+> - **Photos** are resized client-side (1600 px JPEG) and stored in Postgres, checked by magic
+>   bytes and served with `nosniff`. Move them to object storage if the database grows large.
 >
 > Phase 2 notes:
 > - Gravity, temperature and pH are **separate charts** (one y-axis each), with the previous batch

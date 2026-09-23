@@ -1,5 +1,5 @@
 import { BrewList } from "@/components/brew-list";
-import { ButtonLink, Card, Empty, Input, PageHeader, Select } from "@/components/ui";
+import { ButtonLink, Card, DownloadLink, Empty, Input, PageHeader, Select } from "@/components/ui";
 import { db } from "@/lib/db";
 import { STATUSES } from "@/lib/brewing";
 import type { Prisma } from "@/generated/prisma/client";
@@ -47,6 +47,9 @@ export default async function BrewsPage(props: PageProps<"/brews">) {
     <>
       <PageHeader title="🍺 My Brews" actions={
           <>
+            <DownloadLink href="/brews/export.csv" variant="ghost">
+              Export CSV
+            </DownloadLink>
             <ButtonLink href="/compare" variant="secondary">
               Compare
             </ButtonLink>

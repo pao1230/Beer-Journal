@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, Home, Lightbulb, History, Plus, Wheat, Wrench } from "lucide-react";
+import { BookOpen, GitCompare, Home, Lightbulb, History, Package, Plus, Wheat, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const desktop = [
   { href: "/", label: "Dashboard" },
   { href: "/recipes", label: "Recipes" },
   { href: "/ingredients", label: "Ingredients" },
+  { href: "/inventory", label: "Inventory" },
   { href: "/brews", label: "Brews" },
   { href: "/compare", label: "Compare" },
   { href: "/lessons", label: "Lessons" },
@@ -37,7 +38,7 @@ export function TopNav() {
         <Link href="/" className="font-bold whitespace-nowrap">
           🍺 Brewing Journal
         </Link>
-        <nav className="hidden gap-1 md:flex">
+        <nav className="hidden gap-1 lg:flex">
           {desktop.map((l) => (
             <Link
               key={l.href}
@@ -51,13 +52,23 @@ export function TopNav() {
             </Link>
           ))}
         </nav>
-        <div className="ml-auto flex gap-1 md:hidden">
-          <Link href="/ingredients" aria-label="Ingredients" className="rounded-md p-2 hover:bg-muted">
-            <Wheat className="size-5" />
-          </Link>
-          <Link href="/equipment" aria-label="Equipment" className="rounded-md p-2 hover:bg-muted">
-            <Wrench className="size-5" />
-          </Link>
+        <div className="ml-auto flex gap-1 lg:hidden">
+          {[
+            { href: "/ingredients", label: "Ingredients", Icon: Wheat },
+            { href: "/inventory", label: "Inventory", Icon: Package },
+            { href: "/compare", label: "Compare", Icon: GitCompare },
+            { href: "/equipment", label: "Equipment", Icon: Wrench },
+          ].map(({ href, label, Icon }) => (
+            <Link
+              key={href}
+              href={href}
+              aria-label={label}
+              title={label}
+              className={cn("rounded-md p-2 hover:bg-muted", pathname.startsWith(href) && "bg-muted text-primary")}
+            >
+              <Icon className="size-5" />
+            </Link>
+          ))}
         </div>
       </div>
     </header>
@@ -67,7 +78,7 @@ export function TopNav() {
 export function BottomNav() {
   const pathname = usePathname();
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] md:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] lg:hidden">
       {mobile.map(({ href, label, icon: Icon }) => (
         <Link
           key={href}

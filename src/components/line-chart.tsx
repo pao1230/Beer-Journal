@@ -204,7 +204,7 @@ export function LineChart({ title, series: input, yDecimals, yUnit = "", referen
         )}
       </div>
 
-      <details className="text-xs">
+      <details className="no-print text-xs">
         <summary className="cursor-pointer text-muted-foreground">Show data table</summary>
         <table className="mt-2 w-full tabular-nums">
           <thead className="text-left text-muted-foreground">

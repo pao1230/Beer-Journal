@@ -4,7 +4,7 @@ import { CheckCircle2, Circle } from "lucide-react";
 import { ActionForm } from "@/components/action-form";
 import { IngredientTable } from "@/components/ingredient-table";
 import { StatusBadge } from "@/components/status-badge";
-import { Button, ButtonLink, Card, CardTitle, Field, Input, PageHeader, Select, Stat, Textarea } from "@/components/ui";
+import { Button, ButtonLink, Card, DownloadLink, CardTitle, Field, Input, PageHeader, Select, Stat, Textarea } from "@/components/ui";
 import { db } from "@/lib/db";
 import {
   abv,
@@ -20,6 +20,11 @@ import {
 } from "@/lib/brewing";
 import { cloneBrew, deleteSession, updateBrewIngredient, updateSession } from "../actions";
 import { LessonForm, LessonItem, ProblemCard, ProblemForm } from "../journal";
+import { INGREDIENT_SPECS } from "@/lib/recipe-calc";
+import { brewhouseEfficiency } from "@/lib/calc";
+import { fmtMoney, lineCost } from "@/lib/inventory";
+import { loadStock } from "@/lib/inventory-data";
+import { deductBrew, undoDeduction } from "@/app/inventory/actions";
 
 async function load(idParam: string) {
   const id = Number(idParam);
@@ -30,7 +35,10 @@ async function load(idParam: string) {
       recipe: true,
       recipeVersion: true,
       clonedFrom: { select: { id: true, batchNumber: true } },
-      ingredients: { orderBy: { sortOrder: "asc" }, include: { ingredient: { select: { type: true } } } },
+      ingredients: {
+        orderBy: { sortOrder: "asc" },
+        include: { ingredient: { select: { ...INGREDIENT_SPECS.select, stockUnit: true } } },
+      },
       steps: {
         include: {
           _count: { select: { measurements: true, problems: true, fermentationLog: true } },
@@ -79,6 +87,24 @@ export default async function BrewPage(props: PageProps<"/brews/[id]">) {
     actualFg: session.actualFg,
   });
   const title = batchLabel(session.recipe.name, session.batchNumber);
+  const used = session.ingredients.map((i) => ({ line: i, amount: i.actualAmount ?? i.plannedAmount }));
+  const efficiency = brewhouseEfficiency(
+    session.actualOg,
+    session.actualVolume,
+    used.flatMap(({ line, amount }) =>
+      amount == null || !line.ingredient
+        ? []
+        : [{ ...line.ingredient, name: line.nameSnapshot, amount, unit: line.unit, stage: line.stage, additionTime: line.additionTime }],
+    ),
+  );
+  const [stock, deducted] = await Promise.all([
+    loadStock([...new Set(session.ingredients.flatMap((i) => (i.ingredientId ? [i.ingredientId] : [])))]),
+    db.inventoryTransaction.findFirst({ where: { brewSessionId: session.id, reason: "BREW" }, select: { createdAt: true } }),
+  ]);
+  const costs = used.map(({ line, amount }) => (line.ingredientId ? lineCost(amount, line.unit, stock.get(line.ingredientId)) : null));
+  const batchCost = costs.some((c) => c != null) ? costs.reduce<number>((s, c) => s + (c ?? 0), 0) : null;
+  const unpriced = costs.filter((c) => c == null).length;
+  const litres = session.actualVolume ?? v.batchSize;
   const stepsByType = new Map(session.steps.map((s) => [s.type, s]));
   const phReadings = STEPS.flatMap((def) => {
     const step = stepsByType.get(def.type);
@@ -125,6 +151,12 @@ export default async function BrewPage(props: PageProps<"/brews/[id]">) {
             <ActionForm action={cloneBrew.bind(null, session.id)}>
               <Button variant="secondary">Clone this brew</Button>
             </ActionForm>
+            <ButtonLink variant="secondary" href={`/brews/${session.id}/print`}>
+              Report / PDF
+            </ButtonLink>
+            <DownloadLink variant="ghost" href={`/brews/${session.id}/export.csv`}>
+              CSV
+            </DownloadLink>
           </>
         }
       />
@@ -316,6 +348,36 @@ export default async function BrewPage(props: PageProps<"/brews/[id]">) {
               </ul>
             )}
             <LessonForm sessionId={session.id} />
+          </Card>
+
+          <Card>
+            <CardTitle>Efficiency & cost</CardTitle>
+            <div className="grid grid-cols-2 gap-3">
+              <Stat label="Brewhouse efficiency" value={efficiency == null ? "–" : `${efficiency.toFixed(0)}%`} />
+              <Stat label="Batch cost" value={fmtMoney(batchCost)} />
+              <Stat label="Cost per litre" value={batchCost == null ? "–" : fmtMoney(batchCost / litres)} />
+              <Stat label="Per 330 ml" value={batchCost == null ? "–" : fmtMoney((batchCost / litres) * 0.33)} />
+            </div>
+            {efficiency == null && (
+              <p className="mt-2 text-xs text-muted-foreground">Efficiency needs actual OG, volume and grain potentials.</p>
+            )}
+            {unpriced > 0 && batchCost != null && (
+              <p className="mt-2 text-xs text-muted-foreground">{unpriced} ingredient line(s) have no purchase price.</p>
+            )}
+            <div className="mt-3 border-t border-border pt-3 text-sm">
+              {deducted ? (
+                <ActionForm action={undoDeduction.bind(null, session.id)} className="flex flex-wrap items-center justify-between gap-2">
+                  <span>✓ Deducted from inventory {fmtDate(deducted.createdAt)}</span>
+                  <Button variant="ghost" type="submit">Undo</Button>
+                </ActionForm>
+              ) : (
+                <ActionForm action={deductBrew.bind(null, session.id)}>
+                  <Button variant="secondary" type="submit" className="w-full">
+                    Deduct ingredients from inventory
+                  </Button>
+                </ActionForm>
+              )}
+            </div>
           </Card>
 
           <Card>

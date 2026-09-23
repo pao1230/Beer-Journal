@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { run } from "@/lib/action";
 import { PACKAGING_METHODS, STATUSES, STEPS, validateGravity } from "@/lib/brewing";
-import { num, required, str, type ActionState } from "@/lib/form";
+import { int, num, required, str, type ActionState } from "@/lib/form";
+import { PHOTO_MAX_BYTES, sniffImageType } from "@/lib/image";
 import type { BrewStatus } from "@/generated/prisma/enums";
 import type { Prisma } from "@/generated/prisma/client";
 
@@ -276,5 +277,34 @@ export async function addLesson(sessionId: number | null, _: ActionState, fd: Fo
 
 export async function deleteLesson(id: number) {
   await db.lesson.delete({ where: { id } });
+  touch();
+}
+
+export async function uploadPhoto(stepId: number, _: ActionState, fd: FormData) {
+  return run(async () => {
+    const file = fd.get("photo");
+    if (!(file instanceof File) || file.size === 0) throw new Error("Choose a photo");
+    if (file.size > PHOTO_MAX_BYTES) throw new Error("Photo is too large (max 3.5 MB after resizing)");
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const mimeType = sniffImageType(bytes);
+    if (!mimeType) throw new Error("Only JPEG, PNG or WebP photos are supported");
+    const count = await db.photo.count({ where: { brewStepId: stepId } });
+    if (count >= 24) throw new Error("This step already has 24 photos");
+    await db.photo.create({
+      data: {
+        brewStepId: stepId,
+        mimeType,
+        data: bytes,
+        width: int(fd, "width"),
+        height: int(fd, "height"),
+        caption: str(fd, "caption"),
+      },
+    });
+    touch();
+  });
+}
+
+export async function deletePhoto(id: number) {
+  await db.photo.delete({ where: { id } });
   touch();
 }

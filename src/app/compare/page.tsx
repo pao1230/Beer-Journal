@@ -17,6 +17,10 @@ import {
   STEPS,
 } from "@/lib/brewing";
 import { cn } from "@/lib/utils";
+import { brewhouseEfficiency } from "@/lib/calc";
+import { fmtMoney, lineCost } from "@/lib/inventory";
+import { loadStock } from "@/lib/inventory-data";
+import { INGREDIENT_SPECS } from "@/lib/recipe-calc";
 
 export const metadata = { title: "Compare brews" };
 
@@ -109,7 +113,7 @@ export default async function ComparePage(props: PageProps<"/compare">) {
       include: {
         recipe: { select: { name: true } },
         recipeVersion: { select: { version: true, targetOg: true, targetFg: true } },
-        ingredients: { orderBy: { sortOrder: "asc" } },
+        ingredients: { orderBy: { sortOrder: "asc" }, include: { ingredient: INGREDIENT_SPECS } },
         steps: { include: { measurements: { orderBy: { recordedAt: "asc" } }, fermentationLog: { orderBy: { date: "asc" } } } },
         problems: { orderBy: { createdAt: "asc" }, select: { title: true } },
         _count: { select: { lessons: true } },
@@ -123,6 +127,22 @@ export default async function ComparePage(props: PageProps<"/compare">) {
   ]);
 
   const label = (b: (typeof brews)[number]) => batchLabel(b.recipe.name, b.batchNumber);
+  const stock = await loadStock([...new Set(brews.flatMap((b) => b.ingredients.flatMap((i) => (i.ingredientId ? [i.ingredientId] : []))))]);
+  const economics = brews.map((b) => {
+    const used = b.ingredients.map((i) => ({ i, amount: i.actualAmount ?? i.plannedAmount }));
+    const efficiency = brewhouseEfficiency(
+      b.actualOg,
+      b.actualVolume,
+      used.flatMap(({ i, amount }) =>
+        amount == null || !i.ingredient
+          ? []
+          : [{ ...i.ingredient, name: i.nameSnapshot, amount, unit: i.unit, stage: i.stage, additionTime: i.additionTime }],
+      ),
+    );
+    const costs = used.map(({ i, amount }) => (i.ingredientId ? lineCost(amount, i.unit, stock.get(i.ingredientId)) : null));
+    const cost = costs.some((c) => c != null) ? costs.reduce<number>((s, c) => s + (c ?? 0), 0) : null;
+    return { efficiency, cost };
+  });
   const n = brews.length;
 
   const overview: Row[] = [
@@ -140,6 +160,8 @@ export default async function ComparePage(props: PageProps<"/compare">) {
         return a == null ? null : `${a.toFixed(0)}%`;
       }),
     },
+    { label: "Brewhouse efficiency", values: economics.map((e) => (e.efficiency == null ? null : `${e.efficiency.toFixed(0)}%`)) },
+    { label: "Batch cost", values: economics.map((e) => (e.cost == null ? null : fmtMoney(e.cost))) },
     { label: "Packaging", values: brews.map((b) => b.packagingMethod) },
     { label: "Problems", values: brews.map((b) => String(b.problems.length)), always: true },
     { label: "Lessons", values: brews.map((b) => String(b._count.lessons)) },

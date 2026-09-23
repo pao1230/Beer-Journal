@@ -48,7 +48,14 @@ export default async function IngredientsPage(props: PageProps<"/ingredients">) 
     <>
       <PageHeader
         title="Ingredients"
-        actions={<ButtonLink href={`/ingredients/new${type ? `?type=${type}` : ""}`}>+ New ingredient</ButtonLink>}
+        actions={
+          <>
+            <ButtonLink href="/inventory" variant="secondary">
+              Inventory
+            </ButtonLink>
+            <ButtonLink href={`/ingredients/new${type ? `?type=${type}` : ""}`}>+ New ingredient</ButtonLink>
+          </>
+        }
       />
       <form className="mb-4 flex flex-wrap gap-2">
         <Input name="q" defaultValue={q} placeholder="Search name, brand, supplier" className="max-w-xs" />

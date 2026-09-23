@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { ActionForm } from "@/components/action-form";
 import { Button, Card, PageHeader } from "@/components/ui";
 import { db } from "@/lib/db";
+import { StockCard } from "@/app/inventory/stock-card";
 import { deleteIngredient, setArchived, updateIngredient } from "../../actions";
 import { IngredientForm } from "../../ingredient-form";
 
@@ -26,6 +27,7 @@ export default async function EditIngredientPage(props: PageProps<"/ingredients/
       <Card>
         <IngredientForm action={updateIngredient.bind(null, id)} ingredient={ingredient} />
       </Card>
+      <StockCard ingredientId={id} />
       <Card className="mt-4 flex flex-wrap items-center gap-3">
         <form action={setArchived.bind(null, id, !ingredient.isArchived)}>
           <Button variant="secondary">{ingredient.isArchived ? "Unarchive" : "Archive"}</Button>

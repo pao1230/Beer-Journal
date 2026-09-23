@@ -63,3 +63,31 @@ body {
   background: var(--background);
   color: var(--foreground);
 }
+
+@media print {
+  :root {
+    --background: #ffffff;
+    --foreground: #000000;
+    --card: #ffffff;
+    --muted: #f5f5f4;
+    --muted-foreground: #57534e;
+    --border: #d6d3d1;
+    --warning-bg: #fffbeb;
+    --warning-border: #fcd34d;
+  }
+  header,
+  nav,
+  .no-print {
+    display: none !important;
+  }
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+  section,
+  figure,
+  tr,
+  li {
+    break-inside: avoid;
+  }
+}

@@ -3,7 +3,7 @@
 Personal homebrewing journal: recipes, brew sessions, problems and lessons learned — so each
 batch learns from the last one. See [PLAN.md](PLAN.md) for the full product plan.
 
-**Phases 1 and 2 are implemented:**
+**Phases 1–3 are implemented:**
 
 - **Ingredients** — type-specific specs (color/potential, alpha acid, attenuation), search, archive
   instead of delete once used
@@ -29,6 +29,15 @@ batch learns from the last one. See [PLAN.md](PLAN.md) for the full product plan
 - **Recipe scaling** — preview a new batch size, then save as a new version or a new recipe
 - **Search** across problems, lessons and notes — every word must match, "quoted phrases",
   highlights, works for Thai
+- **Calculators** — estimated OG/FG/ABV (grain potential × efficiency; kettle sugars and
+  unfermentable lactose handled), IBU (Tinseth), SRM (Morey), water ions in ppm from brewing
+  salts, actual brewhouse efficiency, priming sugar. Live in the recipe editor too
+- **Inventory & cost** — stock ledger per ingredient (purchases, stock counts, brew deductions
+  with undo), weighted-average cost, batch cost and cost per litre, "enough in stock?" check on
+  every recipe
+- **Photos** on any brew step — resized in the browser, stored in Postgres (no external storage)
+- **Export** — CSV of all brews or one brew's full record (Excel-friendly UTF-8), and a printable
+  report you can save as PDF (renders Thai correctly)
 - Mobile bottom nav, installable web app manifest, optional basic auth
 
 ## Stack
@@ -52,7 +61,7 @@ npm run dev                   # http://localhost:3000
 | `npm run dev` / `build` / `start` | Next.js |
 | `npm run typecheck` | Route type generation + `tsc` |
 | `npm run lint` | ESLint |
-| `npm test` | Unit tests (brewing math, scaling, chart ticks, search parsing) |
+| `npm test` | Unit tests (brewing math, calculators, inventory, CSV, scaling, search) |
 | `npm run db:migrate` | Create/apply a migration in development |
 | `npm run db:deploy` | Apply migrations in production |
 | `npm run db:seed` | Seed sample data (skipped if the DB already has data) |
@@ -76,4 +85,7 @@ src/app/compare             side-by-side brew comparison
 src/app/lessons             knowledge-base search (problems, lessons, notes)
 src/components/line-chart   dependency-free SVG line chart
 src/lib/search.ts           query parsing, filters, highlighting
+src/lib/calc.ts             IBU/SRM/OG/FG, water profile, efficiency, priming sugar
+src/lib/inventory.ts        stock ledger math and costing
+src/app/inventory           inventory page, stock card, inventory actions
 ```

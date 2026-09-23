@@ -3,10 +3,19 @@
 import { useState } from "react";
 import { ActionForm } from "@/components/action-form";
 import { Button, ButtonLink, Field, Input, Select, Textarea } from "@/components/ui";
-import { INGREDIENT_TYPES } from "@/lib/brewing";
+import { INGREDIENT_TYPES, UNITS } from "@/lib/brewing";
+import { WATER_SALTS } from "@/lib/calc";
 import type { ActionState } from "@/lib/form";
 import type { Ingredient } from "@/generated/prisma/client";
 import type { IngredientType } from "@/generated/prisma/enums";
+
+const DEFAULT_STOCK_UNIT: Record<IngredientType, string> = {
+  GRAIN: "kg",
+  HOP: "g",
+  YEAST: "pkg",
+  WATER: "g",
+  OTHER: "g",
+};
 
 export function IngredientForm({
   action,
@@ -50,6 +59,16 @@ export function IngredientForm({
           </Field>
         </>
       )}
+      {type === "OTHER" && (
+        <>
+          <Field label="Potential (SG)" hint="Only for sugars/lactose that add gravity, e.g. 1.035">
+            <Input name="potential" type="number" step="0.001" min="1" max="1.1" defaultValue={i?.potential ?? ""} />
+          </Field>
+          <label className="flex items-center gap-2 self-center text-sm">
+            <input type="checkbox" name="unfermentable" defaultChecked={i?.unfermentable ?? false} /> Unfermentable (e.g. lactose) — stays in FG
+          </label>
+        </>
+      )}
       {type === "HOP" && (
         <>
           <Field label="Alpha acid (%)">
@@ -85,6 +104,27 @@ export function IngredientForm({
           </Field>
         </>
       )}
+
+      {type === "WATER" && (
+        <Field label="Salt" hint="Used to calculate the water profile (ppm)">
+          <Select name="waterSalt" defaultValue={i?.waterSalt ?? ""}>
+            <option value="">– not a brewing salt –</option>
+            {Object.entries(WATER_SALTS).map(([key, s]) => (
+              <option key={key} value={key}>
+                {s.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      )}
+      <Field label="Inventory unit" hint="Stock and cost are tracked in this unit">
+        <Select name="stockUnit" defaultValue={i?.stockUnit ?? DEFAULT_STOCK_UNIT[type]} key={type}>
+          <option value="">– don&apos;t track stock –</option>
+          {UNITS.map((u) => (
+            <option key={u}>{u}</option>
+          ))}
+        </Select>
+      </Field>
 
       <Field label="Notes" className="sm:col-span-2">
         <Textarea name="notes" defaultValue={i?.notes ?? ""} />

@@ -24,12 +24,16 @@ import {
   addFermentationLog,
   addMeasurement,
   deleteFermentationLog,
+  deletePhoto,
+  uploadPhoto,
   deleteMeasurement,
   saveStepActuals,
   saveStepNotes,
   setStepComplete,
 } from "../../../actions";
 import { ProblemCard, ProblemForm } from "../../../journal";
+import { PrimingCalculator } from "./priming-calculator";
+import { PhotoUploader } from "./photo-uploader";
 
 type Line = { label: string; value: string };
 type Addition = {
@@ -188,6 +192,7 @@ export default async function StepPage(props: PageProps<"/brews/[id]/steps/[step
       measurements: { orderBy: { recordedAt: "asc" } },
       problems: { orderBy: { createdAt: "asc" }, include: { lessons: true, brewStep: { select: { type: true } } } },
       fermentationLog: { orderBy: { date: "asc" } },
+      photos: { orderBy: { createdAt: "asc" }, select: { id: true, caption: true, width: true, height: true } },
     },
   });
   if (!step) notFound();
@@ -234,6 +239,24 @@ export default async function StepPage(props: PageProps<"/brews/[id]/steps/[step
   const title = batchLabel(session.recipe.name, session.batchNumber);
   const today = new Date().toISOString().slice(0, 10);
   const dayOf = (d: Date) => daysSince(session.brewDate, d);
+  const primingDefaults =
+    def.type === "PACKAGING"
+      ? await (async () => {
+          const ferm = await db.brewStep.findUnique({
+            where: { brewSessionId_type: { brewSessionId: sessionId, type: "FERMENTATION" } },
+            include: { fermentationLog: { select: { temperature: true } }, measurements: { where: { type: "Ferment temp" } } },
+          });
+          const temps = [
+            ...(ferm?.fermentationLog.flatMap((l) => (l.temperature == null ? [] : [l.temperature])) ?? []),
+            ...(ferm?.measurements.map((m) => m.value) ?? []),
+          ];
+          return {
+            volumeL: readings.get("Final volume") ?? session.actualVolume ?? v.batchSize,
+            targetCo2: v.targetCarbonation ?? 2.4,
+            maxTempC: temps.length ? Math.max(...temps) : 20,
+          };
+        })()
+      : null;
 
   const current = fermentationSeries(session.brewDate, session.actualOg, step.fermentationLog);
   const prior = previous && prevStep ? fermentationSeries(previous.brewDate, previous.actualOg, prevStep.fermentationLog) : null;
@@ -465,6 +488,43 @@ export default async function StepPage(props: PageProps<"/brews/[id]/steps/[step
               </ActionForm>
             </Card>
           )}
+
+          {primingDefaults && (
+            <Card>
+              <CardTitle>Priming sugar</CardTitle>
+              <PrimingCalculator {...primingDefaults} />
+            </Card>
+          )}
+
+          <Card>
+            <CardTitle>Photos</CardTitle>
+            {step.photos.length > 0 && (
+              <ul className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {step.photos.map((p) => (
+                  <li key={p.id} className="relative">
+                    <a href={`/photos/${p.id}`} target="_blank" rel="noopener" className="block overflow-hidden rounded-md border border-border">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- served from our own route; already resized */}
+                      <img
+                        src={`/photos/${p.id}`}
+                        alt={p.caption ?? `${def.label} photo`}
+                        width={p.width ?? undefined}
+                        height={p.height ?? undefined}
+                        loading="lazy"
+                        className="aspect-square w-full object-cover"
+                      />
+                    </a>
+                    {p.caption && <p className="mt-1 truncate text-xs text-muted-foreground">{p.caption}</p>}
+                    <form action={deletePhoto.bind(null, p.id)} className="absolute top-1 right-1">
+                      <button aria-label="Delete photo" className="rounded-full bg-card/90 p-1 text-muted-foreground shadow hover:bg-muted">
+                        <X className="size-4" />
+                      </button>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <PhotoUploader action={uploadPhoto.bind(null, step.id)} />
+          </Card>
 
           <Card>
             <CardTitle>Notes</CardTitle>

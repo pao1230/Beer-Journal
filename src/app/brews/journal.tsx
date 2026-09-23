@@ -157,12 +157,14 @@ export function LessonItem({
 
 export function LessonForm({ sessionId }: { sessionId: number | null }) {
   return (
-    <ActionForm action={addLesson.bind(null, sessionId)} resetOnSuccess className="mt-2 flex flex-col gap-2 sm:flex-row">
-      <Input name="text" required placeholder="e.g. Don't measure OG while wort is ~70°C" />
-      <Input name="tags" placeholder="tags, comma separated" className="sm:max-w-48" />
-      <Button type="submit" variant="secondary">
-        Add lesson
-      </Button>
+    <ActionForm action={addLesson.bind(null, sessionId)} resetOnSuccess className="mt-2 flex flex-col gap-2">
+      <Input name="text" required placeholder="e.g. Don't measure OG while wort is ~70°C" aria-label="Lesson" />
+      <div className="flex gap-2">
+        <Input name="tags" placeholder="tags, comma separated" aria-label="Tags" />
+        <Button type="submit" variant="secondary" className="shrink-0">
+          Add lesson
+        </Button>
+      </div>
     </ActionForm>
   );
 }

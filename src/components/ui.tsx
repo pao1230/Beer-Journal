@@ -30,6 +30,15 @@ export function ButtonLink({
   return <Link className={cn(buttonBase, variants[variant], className)} {...props} />;
 }
 
+/** Plain anchor styled as a button, for downloads that must bypass client-side navigation. */
+export function DownloadLink({
+  variant = "secondary",
+  className,
+  ...props
+}: ComponentProps<"a"> & { variant?: Variant }) {
+  return <a download className={cn(buttonBase, variants[variant], className)} {...props} />;
+}
+
 const fieldBase =
   "w-full rounded-md border border-border bg-card px-3 min-h-10 text-sm outline-none focus:ring-2 focus:ring-primary/40";
 
