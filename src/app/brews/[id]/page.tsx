@@ -4,11 +4,12 @@ import { CheckCircle2, Circle } from "lucide-react";
 import { ActionForm } from "@/components/action-form";
 import { IngredientTable } from "@/components/ingredient-table";
 import { StatusBadge } from "@/components/status-badge";
-import { Button, Card, CardTitle, Field, Input, PageHeader, Select, Stat, Textarea } from "@/components/ui";
+import { Button, ButtonLink, Card, CardTitle, Field, Input, PageHeader, Select, Stat, Textarea } from "@/components/ui";
 import { db } from "@/lib/db";
 import {
   abv,
   batchLabel,
+  daysSince,
   fmtAbv,
   fmtDate,
   fmtNum,
@@ -30,7 +31,13 @@ async function load(idParam: string) {
       recipeVersion: true,
       clonedFrom: { select: { id: true, batchNumber: true } },
       ingredients: { orderBy: { sortOrder: "asc" }, include: { ingredient: { select: { type: true } } } },
-      steps: { include: { _count: { select: { measurements: true, problems: true, fermentationLog: true } } } },
+      steps: {
+        include: {
+          _count: { select: { measurements: true, problems: true, fermentationLog: true } },
+          measurements: { where: { type: { contains: "pH", mode: "insensitive" } }, orderBy: { recordedAt: "asc" } },
+          fermentationLog: { where: { ph: { not: null } }, orderBy: { date: "asc" } },
+        },
+      },
       problems: {
         orderBy: { createdAt: "asc" },
         include: { brewStep: { select: { type: true } }, lessons: true },
@@ -55,6 +62,11 @@ export default async function BrewPage(props: PageProps<"/brews/[id]">) {
       : undefined;
 
   const v = session.recipeVersion;
+  const previous = await db.brewSession.findFirst({
+    where: { recipeId: session.recipeId, batchNumber: { lt: session.batchNumber } },
+    orderBy: { batchNumber: "desc" },
+    select: { id: true, batchNumber: true },
+  });
   const swapOptions = await db.ingredient.findMany({
     where: { isArchived: false },
     select: { id: true, name: true, type: true },
@@ -68,6 +80,19 @@ export default async function BrewPage(props: PageProps<"/brews/[id]">) {
   });
   const title = batchLabel(session.recipe.name, session.batchNumber);
   const stepsByType = new Map(session.steps.map((s) => [s.type, s]));
+  const phReadings = STEPS.flatMap((def) => {
+    const step = stepsByType.get(def.type);
+    if (!step) return [];
+    return [
+      ...step.measurements.map((m) => ({ key: `m${m.id}`, step: def.label, label: m.type, value: m.value })),
+      ...step.fermentationLog.map((l) => ({
+        key: `f${l.id}`,
+        step: def.label,
+        label: `Day ${daysSince(session.brewDate, l.date)}`,
+        value: l.ph!,
+      })),
+    ];
+  });
 
   return (
     <>
@@ -91,14 +116,21 @@ export default async function BrewPage(props: PageProps<"/brews/[id]">) {
           </span>
         }
         actions={
-          <ActionForm action={cloneBrew.bind(null, session.id)}>
-            <Button variant="secondary">Clone this brew</Button>
-          </ActionForm>
+          <>
+            {previous && (
+              <ButtonLink variant="secondary" href={`/compare?id=${previous.id}&id=${session.id}`}>
+                Compare with #{String(previous.batchNumber).padStart(3, "0")}
+              </ButtonLink>
+            )}
+            <ActionForm action={cloneBrew.bind(null, session.id)}>
+              <Button variant="secondary">Clone this brew</Button>
+            </ActionForm>
+          </>
         }
       />
 
       <div className="grid gap-4 md:grid-cols-3">
-        <div className="flex flex-col gap-4 md:col-span-2">
+        <div className="flex min-w-0 flex-col gap-4 md:col-span-2">
           <Card>
             <CardTitle>Target vs actual</CardTitle>
             <div className="mb-4 grid grid-cols-4 gap-3 text-sm">
@@ -284,6 +316,40 @@ export default async function BrewPage(props: PageProps<"/brews/[id]">) {
               </ul>
             )}
             <LessonForm sessionId={session.id} />
+          </Card>
+
+          <Card>
+            <CardTitle>pH through the brew</CardTitle>
+            {phReadings.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No pH readings yet — record them on each step.</p>
+            ) : (
+              <table className="w-full text-sm tabular-nums">
+                <thead className="text-left text-xs text-muted-foreground">
+                  <tr>
+                    <th className="py-1 pr-2 font-medium">Step</th>
+                    <th className="py-1 pr-2 font-medium">Reading</th>
+                    <th className="py-1 text-right font-medium">pH</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {phReadings.map((r) => {
+                    const mashRelevant = r.step === "Mashing" || r.step === "Water Preparation";
+                    const off = mashRelevant && v.targetMashPh != null && Math.abs(r.value - v.targetMashPh) > 0.2;
+                    return (
+                      <tr key={r.key}>
+                        <td className="py-1.5 pr-2 text-muted-foreground">{r.step}</td>
+                        <td className="py-1.5 pr-2">{r.label}</td>
+                        <td className="py-1.5 text-right font-semibold">
+                          {off && <span title={`Target mash pH ${v.targetMashPh}`}>⚠️ </span>}
+                          {r.value.toFixed(2)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+            {v.targetMashPh != null && <p className="mt-2 text-xs text-muted-foreground">Target mash pH {v.targetMashPh}</p>}
           </Card>
 
           <Card>

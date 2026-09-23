@@ -10,6 +10,7 @@ const desktop = [
   { href: "/recipes", label: "Recipes" },
   { href: "/ingredients", label: "Ingredients" },
   { href: "/brews", label: "Brews" },
+  { href: "/compare", label: "Compare" },
   { href: "/lessons", label: "Lessons" },
   { href: "/equipment", label: "Equipment" },
 ];

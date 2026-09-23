@@ -2,10 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { ActionForm } from "@/components/action-form";
+import { LineChart, type ChartSeries } from "@/components/line-chart";
 import { Button, ButtonLink, Card, CardTitle, Field, Input, PageHeader, Select, Textarea } from "@/components/ui";
 import { db } from "@/lib/db";
 import {
   batchLabel,
+  daysSince,
+  fermentationSeries,
   fmtDate,
   fmtNum,
   fmtSg,
@@ -198,6 +201,7 @@ export default async function StepPage(props: PageProps<"/brews/[id]/steps/[step
         include: {
           measurements: { orderBy: { recordedAt: "asc" } },
           problems: { include: { lessons: true, brewStep: { select: { type: true } } } },
+          fermentationLog: { orderBy: { date: "asc" } },
         },
       },
     },
@@ -229,7 +233,16 @@ export default async function StepPage(props: PageProps<"/brews/[id]/steps/[step
   const base = `/brews/${session.id}`;
   const title = batchLabel(session.recipe.name, session.batchNumber);
   const today = new Date().toISOString().slice(0, 10);
-  const dayOf = (d: Date) => Math.round((d.getTime() - session.brewDate.getTime()) / 86_400_000);
+  const dayOf = (d: Date) => daysSince(session.brewDate, d);
+
+  const current = fermentationSeries(session.brewDate, session.actualOg, step.fermentationLog);
+  const prior = previous && prevStep ? fermentationSeries(previous.brewDate, previous.actualOg, prevStep.fermentationLog) : null;
+  const withPrevious = (key: "gravity" | "temperature" | "ph"): ChartSeries[] => [
+    { name: `${title} (this batch)`, points: current[key] },
+    ...(prior && prior[key].length > 0
+      ? [{ name: batchLabel(session.recipe.name, previous!.batchNumber), points: prior[key] }]
+      : []),
+  ];
 
   return (
     <>
@@ -250,7 +263,7 @@ export default async function StepPage(props: PageProps<"/brews/[id]/steps/[step
       />
 
       <div className="grid gap-4 md:grid-cols-3">
-        <div className="flex flex-col gap-4 md:col-span-2">
+        <div className="flex min-w-0 flex-col gap-4 md:col-span-2">
           <Card>
             <CardTitle>Target</CardTitle>
             <dl className="grid grid-cols-2 gap-y-1 text-sm">
@@ -362,6 +375,23 @@ export default async function StepPage(props: PageProps<"/brews/[id]/steps/[step
               </ActionForm>
             </details>
           </Card>
+
+          {def.type === "FERMENTATION" && current.gravity.length + current.temperature.length > 0 && (
+            <Card className="flex flex-col gap-6">
+              {current.gravity.length > 0 && (
+                <LineChart
+                  title="Gravity"
+                  series={withPrevious("gravity")}
+                  yDecimals={3}
+                  referenceLines={v.targetFg != null ? [{ y: v.targetFg, label: `Target FG ${fmtSg(v.targetFg)}` }] : []}
+                />
+              )}
+              {current.temperature.length > 0 && (
+                <LineChart title="Temperature (°C)" series={withPrevious("temperature")} yDecimals={1} yUnit="°C" height={180} />
+              )}
+              {current.ph.length > 0 && <LineChart title="pH" series={withPrevious("ph")} yDecimals={2} height={160} />}
+            </Card>
+          )}
 
           {def.type === "FERMENTATION" && (
             <Card>

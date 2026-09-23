@@ -221,3 +221,57 @@ export function validateGravity(og: number | null, fg: number | null) {
   if (og != null && fg != null && fg >= og) return "FG must be lower than OG (values swapped?)";
   return null;
 }
+
+const DAY_MS = 86_400_000;
+
+export function daysSince(start: Date, date: Date) {
+  return Math.round((date.getTime() - start.getTime()) / DAY_MS);
+}
+
+type LogPoint = { date: Date; gravity: number | null; temperature: number | null; ph: number | null };
+
+/** Splits a fermentation log into per-day series; OG counts as the day-0 gravity reading. */
+export function fermentationSeries(brewDate: Date, actualOg: number | null, logs: LogPoint[]) {
+  const pick = (key: "gravity" | "temperature" | "ph") =>
+    logs.flatMap((l) => (l[key] == null ? [] : [{ x: daysSince(brewDate, l.date), y: l[key]! }]));
+  const gravity = pick("gravity");
+  if (actualOg != null && !gravity.some((p) => p.x <= 0)) gravity.unshift({ x: 0, y: actualOg });
+  return { gravity, temperature: pick("temperature"), ph: pick("ph") };
+}
+
+/** Apparent attenuation in %, e.g. OG 1.072 → FG 1.026 is 63.9%. */
+export function attenuation(og: number | null | undefined, fg: number | null | undefined) {
+  if (og == null || fg == null || og <= 1) return null;
+  return ((og - fg) / (og - 1)) * 100;
+}
+
+/** Rounds a scaled amount to something you can actually weigh or count. */
+export function roundAmount(value: number, unit: string) {
+  if (unit === "pkg" || unit === "item") return Math.max(1, Math.ceil(value - 1e-9));
+  if (unit === "tsp") return Math.max(0.25, Math.round(value * 4) / 4);
+  if (value >= 100) return Math.round(value);
+  if (value >= 10) return Math.round(value * 10) / 10;
+  return Math.round(value * 100) / 100;
+}
+
+/**
+ * Scales mash/sparge water to a new batch size. Mash water keeps its thickness (scales with
+ * grain); losses that don't depend on batch size (boil-off, trub, deadspace) stay fixed and
+ * are absorbed by the sparge.
+ */
+export function scaleWater(
+  input: { mashWaterL: number | null; spargeWaterL: number | null; boilTime: number },
+  equipment: { boilOffRate: number; trubLoss: number; mashTunDeadspace: number } | null,
+  ratio: number,
+) {
+  const r1 = (n: number) => Math.round(n * 10) / 10;
+  const { mashWaterL: mash, spargeWaterL: sparge } = input;
+  if (mash == null || sparge == null || !equipment) {
+    return { mashWaterL: mash == null ? null : r1(mash * ratio), spargeWaterL: sparge == null ? null : r1(sparge * ratio) };
+  }
+  const fixed = (equipment.boilOffRate * input.boilTime) / 60 + equipment.trubLoss + equipment.mashTunDeadspace;
+  const total = mash + sparge;
+  const newTotal = Math.max(0, total - fixed) * ratio + fixed;
+  const newMash = mash * ratio;
+  return { mashWaterL: r1(newMash), spargeWaterL: r1(Math.max(0, newTotal - newMash)) };
+}

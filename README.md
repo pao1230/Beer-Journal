@@ -3,7 +3,7 @@
 Personal homebrewing journal: recipes, brew sessions, problems and lessons learned — so each
 batch learns from the last one. See [PLAN.md](PLAN.md) for the full product plan.
 
-**Phase 1 (MVP) is implemented:**
+**Phases 1 and 2 are implemented:**
 
 - **Ingredients** — type-specific specs (color/potential, alpha acid, attenuation), search, archive
   instead of delete once used
@@ -20,6 +20,15 @@ batch learns from the last one. See [PLAN.md](PLAN.md) for the full product plan
   across everything
 - **Validation** — FG must be below OG; warnings when OG/FG, mash temp or pH drift from target,
   with one-tap "Log as problem"
+- **Fermentation charts** — gravity (with target FG), temperature and pH by day, overlaid with the
+  previous batch; hover/keyboard tooltips and a data-table fallback
+- **pH through the brew** — every pH reading from water prep to fermentation, flagged against the
+  target mash pH
+- **Compare brews** — up to 4 batches side by side: overview, every step reading, ingredient
+  amounts, problems, and overlaid fermentation curves; "only differences" toggle
+- **Recipe scaling** — preview a new batch size, then save as a new version or a new recipe
+- **Search** across problems, lessons and notes — every word must match, "quoted phrases",
+  highlights, works for Thai
 - Mobile bottom nav, installable web app manifest, optional basic auth
 
 ## Stack
@@ -43,7 +52,7 @@ npm run dev                   # http://localhost:3000
 | `npm run dev` / `build` / `start` | Next.js |
 | `npm run typecheck` | Route type generation + `tsc` |
 | `npm run lint` | ESLint |
-| `npm test` | Unit tests (brewing math and validation) |
+| `npm test` | Unit tests (brewing math, scaling, chart ticks, search parsing) |
 | `npm run db:migrate` | Create/apply a migration in development |
 | `npm run db:deploy` | Apply migrations in production |
 | `npm run db:seed` | Seed sample data (skipped if the DB already has data) |
@@ -63,5 +72,8 @@ src/app/ingredients         ingredient master
 src/app/equipment           equipment profiles
 src/app/recipes             recipe list/detail/editor + versioning actions
 src/app/brews               sessions, steps, problems, lessons (actions.ts has all mutations)
-src/app/lessons             searchable lessons & problems
+src/app/compare             side-by-side brew comparison
+src/app/lessons             knowledge-base search (problems, lessons, notes)
+src/components/line-chart   dependency-free SVG line chart
+src/lib/search.ts           query parsing, filters, highlighting
 ```

@@ -63,12 +63,15 @@ export default async function RecipePage(props: PageProps<"/recipes/[id]">) {
             <ButtonLink href={`/recipes/${recipe.id}/edit`} variant="secondary">
               Edit
             </ButtonLink>
+            <ButtonLink href={`/recipes/${recipe.id}/scale${isLatest ? "" : `?v=${version.version}`}`} variant="secondary">
+              Scale
+            </ButtonLink>
           </>
         }
       />
 
       <div className="grid gap-4 md:grid-cols-3">
-        <div className="flex flex-col gap-4 md:col-span-2">
+        <div className="flex min-w-0 flex-col gap-4 md:col-span-2">
           <Card>
             <CardTitle>Targets</CardTitle>
             <div className="grid grid-cols-3 gap-4 sm:grid-cols-4">
@@ -157,7 +160,17 @@ export default async function RecipePage(props: PageProps<"/recipes/[id]">) {
 
         <div className="flex flex-col gap-4">
           <Card>
-            <CardTitle>Brews</CardTitle>
+            <CardTitle
+              action={
+                recipe.sessions.length >= 2 && (
+                  <Link className="text-sm underline" href={`/compare?recipe=${recipe.id}`}>
+                    Compare
+                  </Link>
+                )
+              }
+            >
+              Brews
+            </CardTitle>
             {recipe.sessions.length === 0 ? (
               <Empty>Not brewed yet.</Empty>
             ) : (

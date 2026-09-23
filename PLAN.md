@@ -1,9 +1,17 @@
 # 🍺 Brewing Journal Web App — Plan (v2)
 
-> **Status:** Phase 1 is implemented (see [README](README.md)). Some Phase 2 items came for free
-> and are also done: fermentation daily log, recipe versioning, deviation warnings with
-> "Log as problem", and lessons/problems search. Still to do from Phase 2: charts, compare brews,
-> recipe scaling, and proper full-text search.
+> **Status:** Phase 1 and Phase 2 are implemented (see [README](README.md)). Next up is Phase 3
+> (§29: cost, inventory, calculators, export, photos).
+>
+> Phase 2 notes:
+> - Gravity, temperature and pH are **separate charts** (one y-axis each), with the previous batch
+>   of the same recipe overlaid. OG counts as the day-0 gravity unless a reading was logged that day.
+> - **Search** uses every-word substring matching (quoted phrases supported) across problems,
+>   lessons, and step/brew/fermentation notes — not Postgres `tsvector` full-text search, because
+>   Thai is written without spaces between words and `tsvector` can't split it. At personal scale
+>   this is fast enough without an index; add a `pg_trgm` index if it ever isn't.
+> - **Scaling** keeps target gravities/IBU, hop timing and mash temps; mash water scales with the
+>   grain, while boil-off, trub and deadspace losses stay fixed (absorbed by the sparge).
 >
 > Small deviations from §25 made during implementation:
 > - `problems.brew_session_id` is always set (the step is optional), which makes per-brew queries simpler.

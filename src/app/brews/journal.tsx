@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { X } from "lucide-react";
 import { ActionForm } from "@/components/action-form";
+import { Highlight } from "@/components/highlight";
 import { Badge, Button, Field, Input, Textarea } from "@/components/ui";
 import { stepByType } from "@/lib/brewing";
 import type { StepType } from "@/generated/prisma/enums";
@@ -62,10 +63,12 @@ export function ProblemCard({
   problem,
   showStep,
   readOnly,
+  terms,
 }: {
   problem: ProblemData;
   showStep?: boolean;
   readOnly?: boolean;
+  terms?: string[];
 }) {
   const rows = [
     ["Cause", problem.cause],
@@ -76,7 +79,9 @@ export function ProblemCard({
     <article className="rounded-md border border-warning-border bg-warning-bg p-3 text-sm">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <span className="font-semibold">⚠️ {problem.title}</span>
+          <span className="font-semibold">
+            ⚠️ <Highlight text={problem.title} terms={terms} />
+          </span>
           {showStep && problem.brewStep && (
             <Badge className="ml-2">{stepByType(problem.brewStep.type).label}</Badge>
           )}
@@ -89,20 +94,26 @@ export function ProblemCard({
           </form>
         )}
       </div>
-      {problem.description && <p className="mt-1 whitespace-pre-wrap">{problem.description}</p>}
+      {problem.description && (
+        <p className="mt-1 whitespace-pre-wrap">
+          <Highlight text={problem.description} terms={terms} />
+        </p>
+      )}
       {rows.length > 0 && (
         <dl className="mt-2 grid grid-cols-[5rem_1fr] gap-x-2 gap-y-0.5">
           {rows.map(([label, value]) => (
             <div key={label} className="contents">
               <dt className="text-muted-foreground">{label}</dt>
-              <dd>{value}</dd>
+              <dd>
+                <Highlight text={value!} terms={terms} />
+              </dd>
             </div>
           ))}
         </dl>
       )}
       {problem.lessons.map((l) => (
         <p key={l.id} className="mt-2">
-          💡 {l.text}
+          💡 <Highlight text={l.text} terms={terms} />
         </p>
       ))}
     </article>
@@ -112,14 +123,18 @@ export function ProblemCard({
 export function LessonItem({
   lesson,
   source,
+  terms,
 }: {
   lesson: LessonData;
   source?: { href: string; label: string };
+  terms?: string[];
 }) {
   return (
     <li className="flex items-start justify-between gap-2 py-2 text-sm">
       <div>
-        <p>💡 {lesson.text}</p>
+        <p>
+          💡 <Highlight text={lesson.text} terms={terms} />
+        </p>
         <div className="mt-1 flex flex-wrap gap-1">
           {lesson.tags.map((t) => (
             <Badge key={t}>#{t}</Badge>

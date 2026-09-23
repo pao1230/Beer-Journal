@@ -45,7 +45,14 @@ export default async function BrewsPage(props: PageProps<"/brews">) {
 
   return (
     <>
-      <PageHeader title="🍺 My Brews" actions={<ButtonLink href="/brews/new">+ New brew</ButtonLink>} />
+      <PageHeader title="🍺 My Brews" actions={
+          <>
+            <ButtonLink href="/compare" variant="secondary">
+              Compare
+            </ButtonLink>
+            <ButtonLink href="/brews/new">+ New brew</ButtonLink>
+          </>
+        } />
       <form className="mb-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
         <Input name="q" defaultValue={q} placeholder="Search recipe, notes, problems" className="col-span-2 sm:max-w-xs" />
         <Select name="style" defaultValue={style} className="sm:w-auto">

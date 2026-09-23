@@ -6,7 +6,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { run } from "@/lib/action";
 import { int, num, required, str, type ActionState } from "@/lib/form";
-import { validateGravity } from "@/lib/brewing";
+import { roundAmount, scaleWater, validateGravity } from "@/lib/brewing";
 import type { Prisma } from "@/generated/prisma/client";
 
 const stage = z.enum(["MASH", "SPARGE", "BOIL", "WHIRLPOOL", "FERMENTATION", "DRY_HOP", "PACKAGING"]);
@@ -170,5 +170,63 @@ export async function deleteRecipe(recipeId: number, _: ActionState) {
     await db.recipe.delete({ where: { id: recipeId } });
     revalidatePath("/recipes");
     redirect("/recipes");
+  });
+}
+
+/** Saves a version scaled to a new batch size, as a new version or as a separate recipe. */
+export async function saveScaledRecipe(versionId: number, _: ActionState, fd: FormData) {
+  return run(async () => {
+    const size = required(num(fd, "size"), "Batch size");
+    if (size <= 0 || size > 2000) throw new Error("Batch size must be between 0 and 2000 L");
+    const mode = str(fd, "mode");
+    if (mode !== "version" && mode !== "copy") throw new Error("Choose how to save");
+
+    const src = await db.recipeVersion.findUniqueOrThrow({
+      where: { id: versionId },
+      include: { recipe: true, equipmentProfile: true, ingredients: { orderBy: { sortOrder: "asc" } }, mashSteps: true },
+    });
+    const ratio = size / src.batchSize;
+    const water = scaleWater(src, src.equipmentProfile, ratio);
+    const data = {
+      notes: `Scaled from ${src.batchSize} L (v${src.version}) to ${size} L`,
+      equipmentProfileId: src.equipmentProfileId,
+      batchSize: size,
+      boilTime: src.boilTime,
+      targetOg: src.targetOg,
+      targetFg: src.targetFg,
+      targetIbu: src.targetIbu,
+      targetSrm: src.targetSrm,
+      targetCarbonation: src.targetCarbonation,
+      waterSource: src.waterSource,
+      targetMashPh: src.targetMashPh,
+      ...water,
+      ingredients: {
+        create: src.ingredients.map(({ id: _id, recipeVersionId: _v, amount, ...rest }) => ({
+          ...rest,
+          amount: roundAmount(amount * ratio, rest.unit),
+        })),
+      },
+      mashSteps: {
+        create: src.mashSteps.map(({ stepOrder, name, temperature, timeMin }) => ({ stepOrder, name, temperature, timeMin })),
+      },
+    };
+
+    let recipeId = src.recipeId;
+    if (mode === "version") {
+      const latest = await db.recipeVersion.aggregate({ where: { recipeId }, _max: { version: true } });
+      await db.recipeVersion.create({ data: { recipeId, version: (latest._max.version ?? 0) + 1, ...data } });
+    } else {
+      const copy = await db.recipe.create({
+        data: {
+          name: `${src.recipe.name} (${size} L)`,
+          style: src.recipe.style,
+          notes: src.recipe.notes,
+          versions: { create: { version: 1, ...data } },
+        },
+      });
+      recipeId = copy.id;
+    }
+    revalidatePath("/recipes");
+    redirect(`/recipes/${recipeId}`);
   });
 }
