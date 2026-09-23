@@ -9,6 +9,6 @@ export default defineConfig({
   },
   // Migrations need a session connection; on Supabase set DIRECT_URL to the session pooler (port 5432).
   datasource: {
-    url: process.env["DIRECT_URL"] ?? process.env["DATABASE_URL"],
+    url: process.env["DIRECT_URL"] || process.env["DATABASE_URL"],
   },
 });
