@@ -68,9 +68,22 @@ npm run dev                   # http://localhost:3000
 
 ## Deploying
 
-There is no login yet (Phase 1 is single-user). **Before putting it on the internet, set
+There is no login yet (single-user). **Before putting it on the internet, set
 `BASIC_AUTH_USER` and `BASIC_AUTH_PASSWORD`** — `src/proxy.ts` then requires HTTP basic auth on
-every page and server action. Run `npm run db:deploy` against the production database.
+every page and server action.
+
+Vercel + Supabase:
+
+| Vercel env var | Value |
+|---|---|
+| `DATABASE_URL` | Supabase transaction pooler URL (port 6543) — used by the app |
+| `DIRECT_URL` | Supabase session pooler URL (port 5432) — used by migrations |
+| `BASIC_AUTH_USER` / `BASIC_AUTH_PASSWORD` | your login |
+
+Set the Build Command to `prisma migrate deploy && next build` so each deploy applies new
+migrations first (a failed migration fails the deploy and the previous version stays live).
+Set the function region to Singapore (`sin1`) to sit next to the database, and turn off
+Supabase's Data API — the app doesn't use it.
 
 ## Layout
 
