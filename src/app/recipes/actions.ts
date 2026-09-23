@@ -5,21 +5,28 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { run } from "@/lib/action";
+import { UserError } from "@/lib/user-error";
 import { int, num, required, str, type ActionState } from "@/lib/form";
-import { roundAmount, scaleWater, validateGravity } from "@/lib/brewing";
+import { DEFAULT_UNIT, roundAmount, scaleWater, UNITS, validateGravity } from "@/lib/brewing";
 import type { Prisma } from "@/generated/prisma/client";
 
 const stage = z.enum(["MASH", "SPARGE", "BOIL", "WHIRLPOOL", "FERMENTATION", "DRY_HOP", "PACKAGING"]);
 
+const ingredientType = z.enum(["GRAIN", "HOP", "YEAST", "WATER", "OTHER"]);
+
 const ingredientRows = z.array(
   z.object({
-    ingredientId: z.number().int(),
+    ingredientId: z.number().int().nullable(),
+    newIngredient: z
+      .object({ name: z.string().trim().min(1, "New ingredients need a name").max(100), type: ingredientType })
+      .nullable()
+      .optional(),
     amount: z.number().positive("Ingredient amounts must be greater than 0"),
     unit: z.string().min(1),
     stage,
     additionTime: z.number().int().nullable(),
     notes: z.string().nullable(),
-  }),
+  }).refine((r) => r.ingredientId != null || r.newIngredient, "Each ingredient line needs an ingredient"),
 );
 
 const mashRows = z.array(
@@ -39,8 +46,8 @@ function parseJson<T>(schema: z.ZodType<T>, raw: string | null): T {
 function parseVersion(fd: FormData) {
   const targetOg = num(fd, "targetOg");
   const targetFg = num(fd, "targetFg");
-  const gravityError = validateGravity(targetOg, targetFg);
-  if (gravityError) throw new Error(`Target ${gravityError}`);
+  const gravityError = validateGravity(targetOg, targetFg, ["Target OG", "Target FG"]);
+  if (gravityError) throw gravityError;
   return {
     notes: str(fd, "versionNotes"),
     equipmentProfileId: int(fd, "equipmentProfileId"),
@@ -58,9 +65,33 @@ function parseVersion(fd: FormData) {
   };
 }
 
+/** Reuses an ingredient with the same name and type (any case), otherwise creates it. */
+async function findOrCreateIngredient(name: string, type: z.infer<typeof ingredientType>) {
+  const existing = await db.ingredient.findFirst({
+    where: { type, name: { equals: name, mode: "insensitive" } },
+    orderBy: { isArchived: "asc" },
+  });
+  if (existing) {
+    return existing.isArchived ? db.ingredient.update({ where: { id: existing.id }, data: { isArchived: false } }) : existing;
+  }
+  return db.ingredient.create({ data: { name, type, stockUnit: DEFAULT_UNIT[type] } });
+}
+
 async function versionChildren(fd: FormData) {
-  const rows = parseJson(ingredientRows, str(fd, "ingredients"));
+  const parsed = parseJson(ingredientRows, str(fd, "ingredients"));
   const mash = parseJson(mashRows, str(fd, "mashSteps"));
+  const created = new Map<string, number>();
+  const rows = [];
+  for (const r of parsed) {
+    if (!UNITS.includes(r.unit)) throw new UserError("Unknown unit “{unit}”", { unit: r.unit });
+    let ingredientId = r.ingredientId;
+    if (ingredientId == null && r.newIngredient) {
+      const key = `${r.newIngredient.type}|${r.newIngredient.name.toLowerCase()}`;
+      ingredientId = created.get(key) ?? (await findOrCreateIngredient(r.newIngredient.name, r.newIngredient.type)).id;
+      created.set(key, ingredientId);
+    }
+    rows.push({ ...r, ingredientId: ingredientId! });
+  }
   const ingredients = await db.ingredient.findMany({
     where: { id: { in: rows.map((r) => r.ingredientId) } },
   });
@@ -166,7 +197,7 @@ export async function updateRecipe(recipeId: number, _: ActionState, fd: FormDat
 export async function deleteRecipe(recipeId: number, _: ActionState) {
   return run(async () => {
     const brews = await db.brewSession.count({ where: { recipeId } });
-    if (brews > 0) throw new Error(`This recipe has ${brews} brew(s) — delete those first.`);
+    if (brews > 0) throw new UserError("This recipe has {n} brew(s) — delete those first.", { n: brews });
     await db.recipe.delete({ where: { id: recipeId } });
     revalidatePath("/recipes");
     redirect("/recipes");

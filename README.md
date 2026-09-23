@@ -38,6 +38,9 @@ batch learns from the last one. See [PLAN.md](PLAN.md) for the full product plan
 - **Photos** on any brew step — resized in the browser, stored in Postgres (no external storage)
 - **Export** — CSV of all brews or one brew's full record (Excel-friendly UTF-8), and a printable
   report you can save as PDF (renders Thai correctly)
+- **Thai / English UI** — ไทย/EN switch in the top bar (remembered in a cookie; first visit follows
+  the browser language). Dates show in the Thai calendar in Thai. Brewing abbreviations (OG, FG,
+  ABV, IBU, SRM, pH) and units stay as they are
 - Mobile bottom nav, installable web app manifest, optional basic auth
 
 ## Stack
@@ -80,6 +83,11 @@ Vercel + Supabase:
 | `DIRECT_URL` | Supabase session pooler URL (port 5432) — used by migrations |
 | `BASIC_AUTH_USER` / `BASIC_AUTH_PASSWORD` | your login |
 
+If you connect Supabase through Vercel's Supabase integration instead, nothing needs copying: the
+app also reads the integration's `POSTGRES_PRISMA_URL` / `POSTGRES_URL` (app) and
+`POSTGRES_URL_NON_POOLING` (migrations), and treats their `sslmode=require` as "encrypted,
+certificate not verified" like `psql` does.
+
 Set the Build Command to `prisma migrate deploy && next build` so each deploy applies new
 migrations first (a failed migration fails the deploy and the previous version stays live).
 Set the function region to Singapore (`sin1`) to sit next to the database, and turn off
@@ -100,5 +108,13 @@ src/components/line-chart   dependency-free SVG line chart
 src/lib/search.ts           query parsing, filters, highlighting
 src/lib/calc.ts             IBU/SRM/OG/FG, water profile, efficiency, priming sugar
 src/lib/inventory.ts        stock ledger math and costing
+src/lib/i18n                translations: English text is the key, th.ts has the Thai;
+                            getI18n() on the server, useI18n() in client components
 src/app/inventory           inventory page, stock card, inventory actions
 ```
+
+## Adding text
+
+Wrap UI text in `t("…")` (server: `const { t } = await getI18n()`, client: `useI18n()`), with
+`{placeholders}` for values, and add the Thai to `src/lib/i18n/th.ts`. `npm test` fails if a
+string in the source has no Thai translation or a translation drops a placeholder.

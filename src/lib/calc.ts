@@ -100,15 +100,22 @@ function gravityUnits(ingredients: CalcIngredient[]) {
   return out;
 }
 
+/** English template + values; the UI translates it. */
+export type CalcWarning = { key: string; vars?: Record<string, string | number> };
+
 export function calcRecipe(input: CalcInput) {
-  const warnings: string[] = [];
+  const warnings: CalcWarning[] = [];
   const gal = input.batchSize * GAL_PER_L;
   const grains = input.ingredients.filter((i) => i.type === "GRAIN");
 
   const missingPotential = grains.filter((g) => g.potential == null).map((g) => g.name);
-  if (missingPotential.length) warnings.push(`No potential set for ${missingPotential.join(", ")} — left out of OG.`);
+  if (missingPotential.length) {
+    warnings.push({ key: "No potential set for {names} — left out of OG.", vars: { names: missingPotential.join(", ") } });
+  }
   const efficiency = input.efficiency ?? DEFAULT_EFFICIENCY;
-  if (input.efficiency == null) warnings.push(`No equipment profile, so ${DEFAULT_EFFICIENCY}% efficiency is assumed.`);
+  if (input.efficiency == null) {
+    warnings.push({ key: "No equipment profile, so {n}% efficiency is assumed.", vars: { n: DEFAULT_EFFICIENCY } });
+  }
 
   const gu = gravityUnits(input.ingredients);
   const unfermentablePts = gal > 0 ? (gu.unfermentableMash * (efficiency / 100) + gu.unfermentableKettle) / gal / 1000 : 0;
@@ -119,7 +126,7 @@ export function calcRecipe(input: CalcInput) {
   const fg =
     og != null && yeast ? 1 + (og - 1 - unfermentablePts) * (1 - yeast.attenuation! / 100) + unfermentablePts : null;
   if (input.ingredients.some((i) => i.waterSalt === "CaCO3")) {
-    warnings.push("Chalk (CaCO₃) barely dissolves without acid; its calcium and bicarbonate are shown as if fully dissolved.");
+    warnings.push({ key: "Chalk (CaCO₃) barely dissolves without acid; its calcium and bicarbonate are shown as if fully dissolved." });
   }
 
   // IBU: Tinseth with OG as boil gravity, over the post-boil volume.
@@ -130,7 +137,7 @@ export function calcRecipe(input: CalcInput) {
     if (h.type !== "HOP" || h.stage !== "BOIL" || h.additionTime == null || h.additionTime <= 0) continue;
     const kg = toKg(h.amount, h.unit);
     if (kg == null || h.alphaAcid == null) {
-      warnings.push(`${h.name}: needs alpha acid and a weight to count toward IBU.`);
+      warnings.push({ key: "{name}: needs alpha acid and a weight to count toward IBU.", vars: { name: h.name } });
       continue;
     }
     const mgPerL = ((h.alphaAcid / 100) * kg * 1_000_000) / postBoilL;

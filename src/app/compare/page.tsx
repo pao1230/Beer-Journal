@@ -10,7 +10,6 @@ import {
   batchLabel,
   fermentationSeries,
   fmtAbv,
-  fmtDate,
   fmtNum,
   fmtSg,
   STAGES,
@@ -21,8 +20,12 @@ import { brewhouseEfficiency } from "@/lib/calc";
 import { fmtMoney, lineCost } from "@/lib/inventory";
 import { loadStock } from "@/lib/inventory-data";
 import { INGREDIENT_SPECS } from "@/lib/recipe-calc";
+import { getI18n } from "@/lib/i18n/server";
 
-export const metadata = { title: "Compare brews" };
+export async function generateMetadata() {
+  const { t } = await getI18n();
+  return { title: t("Compare brews") };
+}
 
 const MAX = 4;
 
@@ -33,7 +36,7 @@ function differs(values: (string | null)[]) {
   return new Set(present).size > 1 || (present.length > 0 && present.length < values.length);
 }
 
-function Section({
+async function Section({
   title,
   rows,
   columns,
@@ -46,6 +49,7 @@ function Section({
   onlyDiff: boolean;
   footer?: ReactNode;
 }) {
+  const { t } = await getI18n();
   const shown = rows.filter((r) => r.always || !onlyDiff || differs(r.values));
   if (shown.length === 0 && !footer) return null;
   return (
@@ -65,8 +69,8 @@ function Section({
             >
               {r.label}
               {diff && (
-                <span className="ml-1 font-semibold text-foreground" title="Differs between brews">
-                  ≠<span className="sr-only"> differs</span>
+                <span className="ml-1 font-semibold text-foreground" title={t("Differs between brews")}>
+                  ≠<span className="sr-only"> {t("differs")}</span>
                 </span>
               )}
             </th>
@@ -91,6 +95,7 @@ function Section({
 
 export default async function ComparePage(props: PageProps<"/compare">) {
   const sp = await props.searchParams;
+  const { t, date } = await getI18n();
   const onlyDiff = sp.diff === "1";
   let ids = [sp.id].flat().map(Number).filter(Number.isInteger);
   const recipeId = Number(sp.recipe);
@@ -146,25 +151,25 @@ export default async function ComparePage(props: PageProps<"/compare">) {
   const n = brews.length;
 
   const overview: Row[] = [
-    { label: "Recipe", values: brews.map((b) => `${b.recipe.name} v${b.recipeVersion.version}`) },
-    { label: "Brew date", values: brews.map((b) => fmtDate(b.brewDate)), always: true },
-    { label: "Volume", values: brews.map((b) => fmtNum(b.actualVolume, "L")) },
-    { label: "Target OG / FG", values: brews.map((b) => `${fmtSg(b.recipeVersion.targetOg)} / ${fmtSg(b.recipeVersion.targetFg)}`) },
-    { label: "OG", values: brews.map((b) => fmtSg(b.actualOg)), always: true },
-    { label: "FG", values: brews.map((b) => fmtSg(b.actualFg)), always: true },
-    { label: "ABV", values: brews.map((b) => fmtAbv(abv(b.actualOg, b.actualFg))), always: true },
+    { label: t("Recipe"), values: brews.map((b) => `${b.recipe.name} v${b.recipeVersion.version}`) },
+    { label: t("Brew date"), values: brews.map((b) => date(b.brewDate)), always: true },
+    { label: t("Volume"), values: brews.map((b) => fmtNum(b.actualVolume, "L")) },
+    { label: t("Target OG / FG"), values: brews.map((b) => `${fmtSg(b.recipeVersion.targetOg)} / ${fmtSg(b.recipeVersion.targetFg)}`) },
+    { label: t("OG"), values: brews.map((b) => fmtSg(b.actualOg)), always: true },
+    { label: t("FG"), values: brews.map((b) => fmtSg(b.actualFg)), always: true },
+    { label: t("ABV"), values: brews.map((b) => fmtAbv(abv(b.actualOg, b.actualFg))), always: true },
     {
-      label: "Apparent attenuation",
+      label: t("Apparent attenuation"),
       values: brews.map((b) => {
         const a = attenuation(b.actualOg, b.actualFg);
         return a == null ? null : `${a.toFixed(0)}%`;
       }),
     },
-    { label: "Brewhouse efficiency", values: economics.map((e) => (e.efficiency == null ? null : `${e.efficiency.toFixed(0)}%`)) },
-    { label: "Batch cost", values: economics.map((e) => (e.cost == null ? null : fmtMoney(e.cost))) },
-    { label: "Packaging", values: brews.map((b) => b.packagingMethod) },
-    { label: "Problems", values: brews.map((b) => String(b.problems.length)), always: true },
-    { label: "Lessons", values: brews.map((b) => String(b._count.lessons)) },
+    { label: t("Brewhouse efficiency"), values: economics.map((e) => (e.efficiency == null ? null : `${e.efficiency.toFixed(0)}%`)) },
+    { label: t("Batch cost"), values: economics.map((e) => (e.cost == null ? null : fmtMoney(e.cost))) },
+    { label: t("Packaging"), values: brews.map((b) => (b.packagingMethod ? t(b.packagingMethod) : null)) },
+    { label: t("Problems"), values: brews.map((b) => String(b.problems.length)), always: true },
+    { label: t("Lessons"), values: brews.map((b) => String(b._count.lessons)) },
   ];
 
   const readings: Row[] = STEPS.flatMap((def) => {
@@ -179,7 +184,7 @@ export default async function ComparePage(props: PageProps<"/compare">) {
         return m ? fmtNum(m.value, unit ?? m.unit ?? undefined) : null;
       });
       if (values.every((v) => v == null)) return [];
-      return [{ label: <><span className="text-xs">{def.label}</span> · {type}</>, values }];
+      return [{ label: <><span className="text-xs">{t(def.label)}</span> · {t(type)}</>, values }];
     });
   });
 
@@ -194,7 +199,7 @@ export default async function ComparePage(props: PageProps<"/compare">) {
       <>
         {meta.name}{" "}
         <span className="text-xs">
-          ({STAGES.find((s) => s.value === meta.stage)?.label}
+          ({t(STAGES.find((s) => s.value === meta.stage)?.label ?? meta.stage)}
           {meta.time != null && ` ${meta.time}${meta.stage === "DRY_HOP" ? "d" : "′"}`})
         </span>
       </>
@@ -223,16 +228,16 @@ export default async function ComparePage(props: PageProps<"/compare">) {
   return (
     <>
       <PageHeader
-        title="Compare brews"
-        subtitle="Side by side, to see what changed between batches — not to rank them."
+        title={t("Compare brews")}
+        subtitle={t("Side by side, to see what changed between batches — not to rank them.")}
       />
 
       <details open={n === 0} className="mb-4 rounded-lg border border-border bg-card p-4">
         <summary className="cursor-pointer text-sm font-medium">
-          {n === 0 ? "Choose brews to compare" : `Change selection (${n} of max ${MAX})`}
+          {n === 0 ? t("Choose brews to compare") : t("Change selection ({n} of max {max})", { n, max: MAX })}
         </summary>
         {choices.length === 0 ? (
-          <Empty>No brews yet.</Empty>
+          <Empty>{t("No brews yet.")}</Empty>
         ) : (
           <form className="mt-3 flex flex-col gap-3">
             <div className="grid gap-1 sm:grid-cols-2">
@@ -240,35 +245,35 @@ export default async function ComparePage(props: PageProps<"/compare">) {
                 <label key={c.id} className="flex items-center gap-2 text-sm">
                   <input type="checkbox" name="id" value={c.id} defaultChecked={ids.includes(c.id)} />
                   {batchLabel(c.recipe.name, c.batchNumber)}
-                  <span className="text-xs text-muted-foreground">{fmtDate(c.brewDate)}</span>
+                  <span className="text-xs text-muted-foreground">{date(c.brewDate)}</span>
                 </label>
               ))}
             </div>
             <div>
-              <button className="min-h-10 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground">Compare</button>
+              <button className="min-h-10 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground">{t("Compare")}</button>
             </div>
           </form>
         )}
       </details>
 
-      {truncated && <p className="mb-3 text-sm text-muted-foreground">Showing the first {MAX} selected brews.</p>}
+      {truncated && <p className="mb-3 text-sm text-muted-foreground">{t("Showing the first {n} selected brews.", { n: MAX })}</p>}
 
       {n > 0 && (
         <>
-          {n < 2 && <p className="mb-3 text-sm text-muted-foreground">Pick at least two brews to see differences.</p>}
+          {n < 2 && <p className="mb-3 text-sm text-muted-foreground">{t("Pick at least two brews to see differences.")}</p>}
           <Card className="mb-4">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="font-semibold">Side by side</h2>
+              <h2 className="font-semibold">{t("Side by side")}</h2>
               <div className="flex gap-1 text-sm">
                 <Link href={query({})} className={cn("rounded-md px-2 py-1 hover:bg-muted", !onlyDiff && "bg-muted font-semibold")}>
-                  All rows
+                  {t("All rows")}
                 </Link>
                 <Link href={query({ diff: "1" })} className={cn("rounded-md px-2 py-1 hover:bg-muted", onlyDiff && "bg-muted font-semibold")}>
-                  Only differences
+                  {t("Only differences")}
                 </Link>
               </div>
             </div>
-            <p className="mb-2 text-xs text-muted-foreground">Rows marked ≠ differ between the selected brews.</p>
+            <p className="mb-2 text-xs text-muted-foreground">{t("Rows marked ≠ differ between the selected brews.")}</p>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[32rem] text-sm">
                 <thead>
@@ -287,18 +292,18 @@ export default async function ComparePage(props: PageProps<"/compare">) {
                   </tr>
                 </thead>
                 <tbody>
-                  <Section title="Overview" rows={overview} columns={n} onlyDiff={onlyDiff} />
-                  <Section title="Readings" rows={readings} columns={n} onlyDiff={onlyDiff} />
+                  <Section title={t("Overview")} rows={overview} columns={n} onlyDiff={onlyDiff} />
+                  <Section title={t("Readings")} rows={readings} columns={n} onlyDiff={onlyDiff} />
                   <Section
-                    title="Ingredients (actual amounts)"
+                    title={t("Ingredients (actual amounts)")}
                     rows={ingredientRows}
                     columns={n}
                     onlyDiff={onlyDiff}
-                    footer={onlyDiff && sameIngredients > 0 ? `${sameIngredients} ingredient line(s) identical across brews.` : undefined}
+                    footer={onlyDiff && sameIngredients > 0 ? t("{n} ingredient line(s) identical across brews.", { n: sameIngredients }) : undefined}
                   />
                   <tr>
                     <th colSpan={n + 1} className="pt-5 pb-1 text-left text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                      Problems
+                      {t("Problems")}
                     </th>
                   </tr>
                   <tr className="border-t border-border align-top">
@@ -306,7 +311,7 @@ export default async function ComparePage(props: PageProps<"/compare">) {
                     {brews.map((b) => (
                       <td key={b.id} className="py-1.5 pr-3">
                         {b.problems.length === 0 ? (
-                          <span className="text-muted-foreground">None</span>
+                          <span className="text-muted-foreground">{t("None")}</span>
                         ) : (
                           <ul className="flex flex-col gap-1">
                             {b.problems.map((p, i) => (
@@ -324,10 +329,10 @@ export default async function ComparePage(props: PageProps<"/compare">) {
 
           {(gravityCurves.length > 0 || tempCurves.length > 0) && (
             <Card className="flex flex-col gap-6">
-              <CardTitle>Fermentation curves</CardTitle>
-              {gravityCurves.length > 0 && <LineChart title="Gravity by day" series={gravityCurves} yDecimals={3} />}
+              <CardTitle>{t("Fermentation curves")}</CardTitle>
+              {gravityCurves.length > 0 && <LineChart title={t("Gravity by day")} series={gravityCurves} yDecimals={3} />}
               {tempCurves.length > 0 && (
-                <LineChart title="Temperature by day (°C)" series={tempCurves} yDecimals={1} yUnit="°C" height={180} />
+                <LineChart title={t("Temperature by day (°C)")} series={tempCurves} yDecimals={1} yUnit="°C" height={180} />
               )}
             </Card>
           )}

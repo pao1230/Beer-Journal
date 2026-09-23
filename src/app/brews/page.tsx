@@ -4,10 +4,15 @@ import { db } from "@/lib/db";
 import { STATUSES } from "@/lib/brewing";
 import type { Prisma } from "@/generated/prisma/client";
 import type { BrewStatus } from "@/generated/prisma/enums";
+import { getI18n } from "@/lib/i18n/server";
 
-export const metadata = { title: "My Brews" };
+export async function generateMetadata() {
+  const { t } = await getI18n();
+  return { title: t("My Brews") };
+}
 
 export default async function BrewsPage(props: PageProps<"/brews">) {
+  const { t } = await getI18n();
   const sp = await props.searchParams;
   const one = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string).trim() : "");
   const q = one("q");
@@ -45,27 +50,27 @@ export default async function BrewsPage(props: PageProps<"/brews">) {
 
   return (
     <>
-      <PageHeader title="🍺 My Brews" actions={
+      <PageHeader title={`🍺 ${t("My Brews")}`} actions={
           <>
             <DownloadLink href="/brews/export.csv" variant="ghost">
-              Export CSV
+              {t("Export CSV")}
             </DownloadLink>
             <ButtonLink href="/compare" variant="secondary">
-              Compare
+              {t("Compare")}
             </ButtonLink>
-            <ButtonLink href="/brews/new">+ New brew</ButtonLink>
+            <ButtonLink href="/brews/new">{t("+ New brew")}</ButtonLink>
           </>
         } />
       <form className="mb-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-        <Input name="q" defaultValue={q} placeholder="Search recipe, notes, problems" className="col-span-2 sm:max-w-xs" />
+        <Input name="q" defaultValue={q} placeholder={t("Search recipe, notes, problems")} className="col-span-2 sm:max-w-xs" />
         <Select name="style" defaultValue={style} className="sm:w-auto">
-          <option value="">All styles</option>
+          <option value="">{t("All styles")}</option>
           {styles.map((s) => (
             <option key={s}>{s}</option>
           ))}
         </Select>
         <Select name="recipe" defaultValue={recipeId ?? ""} className="sm:w-auto">
-          <option value="">All recipes</option>
+          <option value="">{t("All recipes")}</option>
           {recipes.map((r) => (
             <option key={r.id} value={r.id}>
               {r.name}
@@ -73,24 +78,24 @@ export default async function BrewsPage(props: PageProps<"/brews">) {
           ))}
         </Select>
         <Select name="status" defaultValue={status ?? ""} className="sm:w-auto">
-          <option value="">Any status</option>
+          <option value="">{t("Any status")}</option>
           {STATUSES.map((s) => (
             <option key={s.value} value={s.value}>
-              {s.label}
+              {t(s.label)}
             </option>
           ))}
         </Select>
         <Select name="year" defaultValue={year ?? ""} className="sm:w-auto">
-          <option value="">Any year</option>
+          <option value="">{t("Any year")}</option>
           {years.map((y) => (
             <option key={y.year}>{y.year}</option>
           ))}
         </Select>
-        <button className="min-h-10 rounded-md border border-border px-3 text-sm hover:bg-muted">Filter</button>
+        <button className="min-h-10 rounded-md border border-border px-3 text-sm hover:bg-muted">{t("Filter")}</button>
       </form>
       <Card>
         {brews.length === 0 ? (
-          <Empty>{filtered ? "No brews match these filters." : "No brews yet — start one from a recipe."}</Empty>
+          <Empty>{filtered ? t("No brews match these filters.") : t("No brews yet — start one from a recipe.")}</Empty>
         ) : (
           <BrewList brews={brews} />
         )}

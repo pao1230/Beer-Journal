@@ -2,12 +2,16 @@ import Link from "next/link";
 import { Highlight } from "@/components/highlight";
 import { Card, CardTitle, Empty, Input, PageHeader } from "@/components/ui";
 import { db } from "@/lib/db";
-import { batchLabel, daysSince, fmtDate, stepByType } from "@/lib/brewing";
+import { batchLabel, daysSince, stepByType } from "@/lib/brewing";
 import { allTermsIn, parseQuery } from "@/lib/search";
 import type { Prisma } from "@/generated/prisma/client";
 import { LessonForm, LessonItem, ProblemCard } from "../brews/journal";
+import { getI18n } from "@/lib/i18n/server";
 
-export const metadata = { title: "Lessons & Problems" };
+export async function generateMetadata() {
+  const { t } = await getI18n();
+  return { title: t("Lessons & Problems") };
+}
 
 const sessionSelect = { select: { id: true, batchNumber: true, brewDate: true, recipe: { select: { name: true } } } };
 
@@ -15,17 +19,18 @@ type NoteHit = { key: string; href: string; source: string; where: string; text:
 
 export default async function LessonsPage(props: PageProps<"/lessons">) {
   const sp = await props.searchParams;
+  const { t, date } = await getI18n();
   const q = typeof sp.q === "string" ? sp.q.trim() : "";
   const terms = parseQuery(q);
   const searching = terms.length > 0;
 
   const lessonWhere: Prisma.LessonWhereInput = searching
     ? {
-        AND: terms.map((t) => ({
+        AND: terms.map((term) => ({
           OR: [
-            { text: { contains: t, mode: "insensitive" as const } },
-            { tags: { has: t.toLowerCase() } },
-            { problem: { is: { title: { contains: t, mode: "insensitive" as const } } } },
+            { text: { contains: term, mode: "insensitive" as const } },
+            { tags: { has: term.toLowerCase() } },
+            { problem: { is: { title: { contains: term, mode: "insensitive" as const } } } },
           ],
         })),
       }
@@ -68,7 +73,7 @@ export default async function LessonsPage(props: PageProps<"/lessons">) {
       key: `s${s.id}`,
       href: `/brews/${s.id}`,
       source: label(s),
-      where: "Brew notes",
+      where: t("Brew notes"),
       text: s.notes ?? "",
       sessionId: s.id,
     })),
@@ -76,7 +81,7 @@ export default async function LessonsPage(props: PageProps<"/lessons">) {
       key: `st${st.id}`,
       href: `/brews/${st.brewSession.id}/steps/${stepByType(st.type).slug}`,
       source: label(st.brewSession),
-      where: stepByType(st.type).label,
+      where: t(stepByType(st.type).label),
       text: st.notes ?? "",
       sessionId: st.brewSession.id,
     })),
@@ -84,8 +89,8 @@ export default async function LessonsPage(props: PageProps<"/lessons">) {
       key: `f${l.id}`,
       href: `/brews/${l.brewStep.brewSession.id}/steps/fermentation`,
       source: label(l.brewStep.brewSession),
-      where: `Fermentation day ${daysSince(l.brewStep.brewSession.brewDate, l.date)}`,
-      text: [l.activity, l.notes].filter(Boolean).join(" · "),
+      where: t("Fermentation day {n}", { n: daysSince(l.brewStep.brewSession.brewDate, l.date) }),
+      text: [l.activity && t(l.activity), l.notes].filter(Boolean).join(" · "),
       sessionId: l.brewStep.brewSession.id,
     })),
   ];
@@ -97,26 +102,33 @@ export default async function LessonsPage(props: PageProps<"/lessons">) {
 
   return (
     <>
-      <PageHeader title="🧠 Lessons & Problems" subtitle="Your brewing knowledge base — search every problem, lesson and note across all batches." />
+      <PageHeader
+        title={`🧠 ${t("Lessons & Problems")}`}
+        subtitle={t("Your brewing knowledge base — search every problem, lesson and note across all batches.")}
+      />
       <form className="mb-2 flex gap-2">
-        <Input name="q" defaultValue={q} placeholder='e.g. hydrometer, "mash temp", อุณหภูมิ' aria-label="Search" />
-        <button className="min-h-10 rounded-md border border-border px-3 text-sm hover:bg-muted">Search</button>
+        <Input name="q" defaultValue={q} placeholder={t('e.g. hydrometer, "mash temp", อุณหภูมิ')} aria-label={t("Search")} />
+        <button className="min-h-10 rounded-md border border-border px-3 text-sm hover:bg-muted">{t("Search")}</button>
       </form>
       <p className="mb-4 text-xs text-muted-foreground">
-        All words must match. Use &ldquo;quotes&rdquo; for an exact phrase. Works for Thai and English.
+        {t("All words must match. Use “quotes” for an exact phrase. Works for Thai and English.")}
       </p>
       {searching && (
         <p className="mb-4 text-sm" role="status">
-          <strong>{problems.length}</strong> problem(s) · <strong>{lessons.length}</strong> lesson(s) ·{" "}
-          <strong>{notes.length}</strong> note(s) — across <strong>{sessionCount}</strong> brew(s)
+          {t("{problems} problem(s) · {lessons} lesson(s) · {notes} note(s) — across {brews} brew(s)", {
+            problems: problems.length,
+            lessons: lessons.length,
+            notes: notes.length,
+            brews: sessionCount,
+          })}
         </p>
       )}
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
-          <CardTitle>💡 Lessons</CardTitle>
+          <CardTitle>💡 {t("Lessons")}</CardTitle>
           {lessons.length === 0 ? (
-            <Empty>{searching ? "No matching lessons." : "No lessons yet."}</Empty>
+            <Empty>{searching ? t("No matching lessons.") : t("No lessons yet.")}</Empty>
           ) : (
             <ul className="divide-y divide-border">
               {lessons.map((l) => (
@@ -128,7 +140,7 @@ export default async function LessonsPage(props: PageProps<"/lessons">) {
                     l.brewSession
                       ? {
                           href: `/brews/${l.brewSession.id}`,
-                          label: `${label(l.brewSession)}${l.problem ? ` · from “${l.problem.title}”` : ""}`,
+                          label: `${label(l.brewSession)}${l.problem ? ` · ${t("from “{title}”", { title: l.problem.title })}` : ""}`,
                         }
                       : undefined
                   }
@@ -138,16 +150,16 @@ export default async function LessonsPage(props: PageProps<"/lessons">) {
           )}
           {!searching && (
             <>
-              <h3 className="mt-4 text-sm font-medium">Add a general lesson</h3>
+              <h3 className="mt-4 text-sm font-medium">{t("Add a general lesson")}</h3>
               <LessonForm sessionId={null} />
             </>
           )}
         </Card>
 
         <Card>
-          <CardTitle>⚠️ Problems</CardTitle>
+          <CardTitle>⚠️ {t("Problems")}</CardTitle>
           {problems.length === 0 ? (
-            <Empty>{searching ? "No matching problems." : "No problems logged yet."}</Empty>
+            <Empty>{searching ? t("No matching problems.") : t("No problems logged yet.")}</Empty>
           ) : (
             <div className="flex flex-col gap-3">
               {problems.map((p) => (
@@ -156,7 +168,7 @@ export default async function LessonsPage(props: PageProps<"/lessons">) {
                     href={p.brewStep ? `/brews/${p.brewSession.id}/steps/${stepByType(p.brewStep.type).slug}` : `/brews/${p.brewSession.id}`}
                     className="mb-1 block text-xs text-muted-foreground underline"
                   >
-                    {label(p.brewSession)} · {fmtDate(p.brewSession.brewDate)}
+                    {label(p.brewSession)} · {date(p.brewSession.brewDate)}
                   </Link>
                   <ProblemCard problem={p} showStep readOnly terms={terms} />
                 </div>
@@ -167,9 +179,9 @@ export default async function LessonsPage(props: PageProps<"/lessons">) {
 
         {searching && (
           <Card className="md:col-span-2">
-            <CardTitle>📝 Notes</CardTitle>
+            <CardTitle>📝 {t("Notes")}</CardTitle>
             {notes.length === 0 ? (
-              <Empty>No matching notes.</Empty>
+              <Empty>{t("No matching notes.")}</Empty>
             ) : (
               <ul className="divide-y divide-border">
                 {notes.map((n) => (

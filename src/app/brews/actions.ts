@@ -95,7 +95,7 @@ export async function updateSession(id: number, _: ActionState, fd: FormData) {
     const actualOg = num(fd, "actualOg");
     const actualFg = num(fd, "actualFg");
     const gravityError = validateGravity(actualOg, actualFg);
-    if (gravityError) throw new Error(gravityError);
+    if (gravityError) throw gravityError;
     const status = str(fd, "status") as BrewStatus | null;
     if (!status || !STATUSES.some((x) => x.value === status)) throw new Error("Pick a status");
     const brewDate = required(str(fd, "brewDate"), "Brew date");
@@ -210,8 +210,8 @@ export async function setStepComplete(stepId: number, complete: boolean) {
 export async function addFermentationLog(stepId: number, _: ActionState, fd: FormData) {
   return run(async () => {
     const gravity = num(fd, "gravity");
-    const gravityError = validateGravity(gravity, null);
-    if (gravityError) throw new Error(gravityError.replace("OG", "Gravity"));
+    const gravityError = validateGravity(gravity, null, ["Gravity", "FG"]);
+    if (gravityError) throw gravityError;
     await db.fermentationLog.create({
       data: {
         brewStepId: stepId,

@@ -4,6 +4,7 @@ import type {
   IngredientType,
   StepType,
 } from "@/generated/prisma/enums";
+import { UserError } from "@/lib/user-error";
 
 export const INGREDIENT_TYPES: { value: IngredientType; label: string }[] = [
   { value: "GRAIN", label: "Grain" },
@@ -32,6 +33,14 @@ export const DEFAULT_STAGE: Record<IngredientType, AdditionStage> = {
 };
 
 export const UNITS = ["kg", "g", "L", "ml", "pkg", "tsp", "item"];
+
+export const DEFAULT_UNIT: Record<IngredientType, string> = {
+  GRAIN: "kg",
+  HOP: "g",
+  YEAST: "pkg",
+  WATER: "g",
+  OTHER: "g",
+};
 
 export const STATUSES: { value: BrewStatus; label: string }[] = [
   { value: "PLANNING", label: "Planning" },
@@ -156,8 +165,10 @@ export function fmtNum(n: number | null | undefined, unit?: string) {
   return unit ? `${s} ${unit}` : s;
 }
 
-export function fmtDate(d: Date) {
-  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+export function fmtDate(d: Date, locale: "en" | "th" = "en") {
+  return locale === "th"
+    ? d.toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" })
+    : d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 export function batchLabel(recipeName: string, batchNumber: number) {
@@ -213,12 +224,16 @@ export function tempWarning(label: string, target: number, actual: number): Devi
   };
 }
 
-/** Returns an error message if the gravity pair is impossible, otherwise null. */
-export function validateGravity(og: number | null, fg: number | null) {
-  for (const [name, v] of [["OG", og], ["FG", fg]] as const) {
-    if (v != null && (v < 0.99 || v > 1.2)) return `${name} ${v} looks wrong — expected e.g. 1.050`;
+/** Returns an error if the gravity pair is impossible, otherwise null. */
+export function validateGravity(og: number | null, fg: number | null, names: [og: string, fg: string] = ["OG", "FG"]) {
+  for (const [name, value] of [[names[0], og], [names[1], fg]] as const) {
+    if (value != null && (value < 0.99 || value > 1.2)) {
+      return new UserError("{name} {value} looks wrong — expected e.g. 1.050", { name, value });
+    }
   }
-  if (og != null && fg != null && fg >= og) return "FG must be lower than OG (values swapped?)";
+  if (og != null && fg != null && fg >= og) {
+    return new UserError("{fg} must be lower than {og} (values swapped?)", { og: names[0], fg: names[1] });
+  }
   return null;
 }
 

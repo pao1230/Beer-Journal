@@ -11,7 +11,6 @@ import {
   batchLabel,
   daysSince,
   fmtAbv,
-  fmtDate,
   fmtNum,
   fmtSg,
   gravityWarnings,
@@ -25,6 +24,7 @@ import { brewhouseEfficiency } from "@/lib/calc";
 import { fmtMoney, lineCost } from "@/lib/inventory";
 import { loadStock } from "@/lib/inventory-data";
 import { deductBrew, undoDeduction } from "@/app/inventory/actions";
+import { getI18n } from "@/lib/i18n/server";
 
 async function load(idParam: string) {
   const id = Number(idParam);
@@ -56,13 +56,14 @@ async function load(idParam: string) {
 }
 
 export async function generateMetadata(props: PageProps<"/brews/[id]">) {
-  const s = await load((await props.params).id);
-  return { title: s ? batchLabel(s.recipe.name, s.batchNumber) : "Brew" };
+  const [s, { t }] = await Promise.all([load((await props.params).id), getI18n()]);
+  return { title: s ? batchLabel(s.recipe.name, s.batchNumber) : t("Brew") };
 }
 
 export default async function BrewPage(props: PageProps<"/brews/[id]">) {
   const session = await load((await props.params).id);
   if (!session) notFound();
+  const { t, date } = await getI18n();
   const sp = await props.searchParams;
   const prefill =
     typeof sp.problem === "string"
@@ -114,7 +115,7 @@ export default async function BrewPage(props: PageProps<"/brews/[id]">) {
       ...step.fermentationLog.map((l) => ({
         key: `f${l.id}`,
         step: def.label,
-        label: `Day ${daysSince(session.brewDate, l.date)}`,
+        label: t("Day {n}", { n: daysSince(session.brewDate, l.date) }),
         value: l.ph!,
       })),
     ];
@@ -127,13 +128,13 @@ export default async function BrewPage(props: PageProps<"/brews/[id]">) {
         subtitle={
           <span className="flex flex-wrap items-center gap-2">
             <StatusBadge status={session.status} />
-            {fmtDate(session.brewDate)} ·
+            {date(session.brewDate)} ·
             <Link className="underline" href={`/recipes/${session.recipeId}?v=${v.version}`}>
               {session.recipe.name} v{v.version}
             </Link>
             {session.clonedFrom && (
               <>
-                · Based on
+                · {t("Based on")}
                 <Link className="underline" href={`/brews/${session.clonedFrom.id}`}>
                   {batchLabel(session.recipe.name, session.clonedFrom.batchNumber)}
                 </Link>
@@ -145,14 +146,14 @@ export default async function BrewPage(props: PageProps<"/brews/[id]">) {
           <>
             {previous && (
               <ButtonLink variant="secondary" href={`/compare?id=${previous.id}&id=${session.id}`}>
-                Compare with #{String(previous.batchNumber).padStart(3, "0")}
+                {t("Compare with #{n}", { n: String(previous.batchNumber).padStart(3, "0") })}
               </ButtonLink>
             )}
             <ActionForm action={cloneBrew.bind(null, session.id)}>
-              <Button variant="secondary">Clone this brew</Button>
+              <Button variant="secondary">{t("Clone this brew")}</Button>
             </ActionForm>
             <ButtonLink variant="secondary" href={`/brews/${session.id}/print`}>
-              Report / PDF
+              {t("Report / PDF")}
             </ButtonLink>
             <DownloadLink variant="ghost" href={`/brews/${session.id}/export.csv`}>
               CSV
@@ -164,19 +165,19 @@ export default async function BrewPage(props: PageProps<"/brews/[id]">) {
       <div className="grid gap-4 md:grid-cols-3">
         <div className="flex min-w-0 flex-col gap-4 md:col-span-2">
           <Card>
-            <CardTitle>Target vs actual</CardTitle>
+            <CardTitle>{t("Target vs actual")}</CardTitle>
             <div className="mb-4 grid grid-cols-4 gap-3 text-sm">
               <span />
-              <span className="text-xs text-muted-foreground">Volume</span>
+              <span className="text-xs text-muted-foreground">{t("Volume")}</span>
               <span className="text-xs text-muted-foreground">OG / FG</span>
               <span className="text-xs text-muted-foreground">ABV</span>
-              <span className="text-muted-foreground">Target</span>
+              <span className="text-muted-foreground">{t("Target")}</span>
               <span className="tabular-nums">{fmtNum(v.batchSize, "L")}</span>
               <span className="tabular-nums">
                 {fmtSg(v.targetOg)} / {fmtSg(v.targetFg)}
               </span>
               <span className="tabular-nums">{fmtAbv(abv(v.targetOg, v.targetFg))}</span>
-              <span className="font-semibold">Actual</span>
+              <span className="font-semibold">{t("Actual")}</span>
               <span className="font-semibold tabular-nums">{fmtNum(session.actualVolume, "L")}</span>
               <span className="font-semibold tabular-nums">
                 {fmtSg(session.actualOg)} / {fmtSg(session.actualFg)}
@@ -190,57 +191,57 @@ export default async function BrewPage(props: PageProps<"/brews/[id]">) {
                 className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-md border border-warning-border bg-warning-bg px-3 py-2 text-sm"
               >
                 <span>
-                  ⚠️ {w.message}: target {w.target}, actual {w.actual}
+                  ⚠️ {t(w.message)}: {t("target {target}, actual {actual}", { target: w.target, actual: w.actual })}
                 </span>
                 <Link
                   className="font-medium underline"
-                  href={`/brews/${session.id}?problem=${encodeURIComponent(w.message)}&detail=${encodeURIComponent(`Target ${w.target}, actual ${w.actual}`)}#new-problem`}
+                  href={`/brews/${session.id}?problem=${encodeURIComponent(t(w.message))}&detail=${encodeURIComponent(t("Target {target}, actual {actual}", { target: w.target, actual: w.actual }))}#new-problem`}
                 >
-                  Log as problem
+                  {t("Log as problem")}
                 </Link>
               </div>
             ))}
 
             <ActionForm action={updateSession.bind(null, session.id)} className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <Field label="Status">
+              <Field label={t("Status")}>
                 <Select name="status" defaultValue={session.status}>
                   {STATUSES.map((s) => (
                     <option key={s.value} value={s.value}>
-                      {s.label}
+                      {t(s.label)}
                     </option>
                   ))}
                 </Select>
               </Field>
-              <Field label="Brew date">
+              <Field label={t("Brew date")}>
                 <Input name="brewDate" type="date" required defaultValue={session.brewDate.toISOString().slice(0, 10)} />
               </Field>
-              <Field label="Volume into fermenter (L)">
+              <Field label={t("Volume into fermenter (L)")}>
                 <Input name="actualVolume" type="number" step="0.1" min="0" defaultValue={session.actualVolume ?? ""} />
               </Field>
-              <Field label="Actual OG">
+              <Field label={t("Actual OG")}>
                 <Input name="actualOg" type="number" step="0.001" min="0.99" max="1.2" defaultValue={session.actualOg ?? ""} />
               </Field>
-              <Field label="Actual FG">
+              <Field label={t("Actual FG")}>
                 <Input name="actualFg" type="number" step="0.001" min="0.99" max="1.2" defaultValue={session.actualFg ?? ""} />
               </Field>
-              <Field label="Notes" className="col-span-2 sm:col-span-3">
+              <Field label={t("Notes")} className="col-span-2 sm:col-span-3">
                 <Textarea name="notes" rows={2} defaultValue={session.notes ?? ""} />
               </Field>
               <div className="col-span-2 sm:col-span-3">
-                <Button type="submit">Save</Button>
+                <Button type="submit">{t("Save")}</Button>
               </div>
             </ActionForm>
           </Card>
 
           <Card>
-            <CardTitle>Brew steps</CardTitle>
+            <CardTitle>{t("Brew steps")}</CardTitle>
             <ol className="divide-y divide-border">
               {STEPS.map((def, idx) => {
                 const step = stepsByType.get(def.type);
                 if (!step) return null;
                 const counts = [
-                  step._count.measurements && `${step._count.measurements} reading(s)`,
-                  step._count.fermentationLog && `${step._count.fermentationLog} log entr${step._count.fermentationLog === 1 ? "y" : "ies"}`,
+                  step._count.measurements && t("{n} reading(s)", { n: step._count.measurements }),
+                  step._count.fermentationLog && t(step._count.fermentationLog === 1 ? "{n} log entry" : "{n} log entries", { n: step._count.fermentationLog }),
                   step._count.problems && `⚠️ ${step._count.problems}`,
                 ].filter(Boolean);
                 return (
@@ -252,7 +253,7 @@ export default async function BrewPage(props: PageProps<"/brews/[id]">) {
                         <Circle className="size-5 shrink-0 text-muted-foreground" />
                       )}
                       <span className="font-medium">
-                        {idx + 1}. {def.label}
+                        {idx + 1}. {t(def.label)}
                       </span>
                       <span className="ml-auto text-xs text-muted-foreground">{counts.join(" · ")}</span>
                     </Link>
@@ -263,12 +264,12 @@ export default async function BrewPage(props: PageProps<"/brews/[id]">) {
           </Card>
 
           <Card>
-            <CardTitle>Ingredients — planned vs actual</CardTitle>
+            <CardTitle>{t("Ingredients — planned vs actual")}</CardTitle>
             <IngredientTable
               rows={session.ingredients.map((i) => ({
                 id: i.id,
                 name: i.nameSnapshot,
-                detail: i.substitutedForName ? `swapped for ${i.substitutedForName}` : i.notes,
+                detail: i.substitutedForName ? t("swapped for {name}", { name: i.substitutedForName }) : i.notes,
                 stage: i.stage,
                 additionTime: i.additionTime,
                 amount:
@@ -284,7 +285,7 @@ export default async function BrewPage(props: PageProps<"/brews/[id]">) {
             />
             {session.ingredients.length > 0 && (
               <details className="mt-3">
-                <summary className="cursor-pointer text-sm font-medium">Record actual amounts / substitutions</summary>
+                <summary className="cursor-pointer text-sm font-medium">{t("Record actual amounts / substitutions")}</summary>
                 <ul className="mt-2 divide-y divide-border">
                   {session.ingredients.map((i) => (
                     <li key={i.id} className="py-2">
@@ -292,15 +293,15 @@ export default async function BrewPage(props: PageProps<"/brews/[id]">) {
                         <div className="col-span-2 text-sm sm:col-span-1">
                           <div className="font-medium">{i.nameSnapshot}</div>
                           <div className="text-xs text-muted-foreground">
-                            planned {fmtNum(i.plannedAmount, i.unit)}
+                            {t("planned {amount}", { amount: fmtNum(i.plannedAmount, i.unit) })}
                           </div>
                         </div>
-                        <Field label={`Actual (${i.unit})`}>
+                        <Field label={t("Actual ({unit})", { unit: i.unit })}>
                           <Input name="actualAmount" type="number" step="any" min="0" defaultValue={i.actualAmount ?? ""} />
                         </Field>
-                        <Field label="Swap for">
+                        <Field label={t("Swap for")}>
                           <Select name="swapTo" defaultValue="">
-                            <option value="">— keep —</option>
+                            <option value="">{t("— keep —")}</option>
                             {swapOptions
                               .filter((o) => o.type === i.ingredient?.type && o.id !== i.ingredientId)
                               .map((o) => (
@@ -311,7 +312,7 @@ export default async function BrewPage(props: PageProps<"/brews/[id]">) {
                           </Select>
                         </Field>
                         <Button type="submit" variant="secondary">
-                          Save
+                          {t("Save")}
                         </Button>
                       </ActionForm>
                     </li>
@@ -324,9 +325,9 @@ export default async function BrewPage(props: PageProps<"/brews/[id]">) {
 
         <div className="flex flex-col gap-4">
           <Card>
-            <CardTitle>Problems</CardTitle>
+            <CardTitle>{t("Problems")}</CardTitle>
             <div className="flex flex-col gap-2">
-              {session.problems.length === 0 && <p className="text-sm text-muted-foreground">No problems logged. 🎉</p>}
+              {session.problems.length === 0 && <p className="text-sm text-muted-foreground">{t("No problems logged. 🎉")}</p>}
               {session.problems.map((p) => (
                 <ProblemCard key={p.id} problem={p} showStep />
               ))}
@@ -335,10 +336,10 @@ export default async function BrewPage(props: PageProps<"/brews/[id]">) {
           </Card>
 
           <Card>
-            <CardTitle>Lessons learned</CardTitle>
+            <CardTitle>{t("Lessons learned")}</CardTitle>
             {session.lessons.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                Lessons from problems show on the problem. Add general takeaways here.
+                {t("Lessons from problems show on the problem. Add general takeaways here.")}
               </p>
             ) : (
               <ul className="divide-y divide-border">
@@ -351,29 +352,29 @@ export default async function BrewPage(props: PageProps<"/brews/[id]">) {
           </Card>
 
           <Card>
-            <CardTitle>Efficiency & cost</CardTitle>
+            <CardTitle>{t("Efficiency & cost")}</CardTitle>
             <div className="grid grid-cols-2 gap-3">
-              <Stat label="Brewhouse efficiency" value={efficiency == null ? "–" : `${efficiency.toFixed(0)}%`} />
-              <Stat label="Batch cost" value={fmtMoney(batchCost)} />
-              <Stat label="Cost per litre" value={batchCost == null ? "–" : fmtMoney(batchCost / litres)} />
-              <Stat label="Per 330 ml" value={batchCost == null ? "–" : fmtMoney((batchCost / litres) * 0.33)} />
+              <Stat label={t("Brewhouse efficiency")} value={efficiency == null ? "–" : `${efficiency.toFixed(0)}%`} />
+              <Stat label={t("Batch cost")} value={fmtMoney(batchCost)} />
+              <Stat label={t("Cost per litre")} value={batchCost == null ? "–" : fmtMoney(batchCost / litres)} />
+              <Stat label={t("Per 330 ml")} value={batchCost == null ? "–" : fmtMoney((batchCost / litres) * 0.33)} />
             </div>
             {efficiency == null && (
-              <p className="mt-2 text-xs text-muted-foreground">Efficiency needs actual OG, volume and grain potentials.</p>
+              <p className="mt-2 text-xs text-muted-foreground">{t("Efficiency needs actual OG, volume and grain potentials.")}</p>
             )}
             {unpriced > 0 && batchCost != null && (
-              <p className="mt-2 text-xs text-muted-foreground">{unpriced} ingredient line(s) have no purchase price.</p>
+              <p className="mt-2 text-xs text-muted-foreground">{t("{n} ingredient line(s) have no purchase price.", { n: unpriced })}</p>
             )}
             <div className="mt-3 border-t border-border pt-3 text-sm">
               {deducted ? (
                 <ActionForm action={undoDeduction.bind(null, session.id)} className="flex flex-wrap items-center justify-between gap-2">
-                  <span>✓ Deducted from inventory {fmtDate(deducted.createdAt)}</span>
-                  <Button variant="ghost" type="submit">Undo</Button>
+                  <span>{t("✓ Deducted from inventory {date}", { date: date(deducted.createdAt) })}</span>
+                  <Button variant="ghost" type="submit">{t("Undo")}</Button>
                 </ActionForm>
               ) : (
                 <ActionForm action={deductBrew.bind(null, session.id)}>
                   <Button variant="secondary" type="submit" className="w-full">
-                    Deduct ingredients from inventory
+                    {t("Deduct ingredients from inventory")}
                   </Button>
                 </ActionForm>
               )}
@@ -381,15 +382,15 @@ export default async function BrewPage(props: PageProps<"/brews/[id]">) {
           </Card>
 
           <Card>
-            <CardTitle>pH through the brew</CardTitle>
+            <CardTitle>{t("pH through the brew")}</CardTitle>
             {phReadings.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No pH readings yet — record them on each step.</p>
+              <p className="text-sm text-muted-foreground">{t("No pH readings yet — record them on each step.")}</p>
             ) : (
               <table className="w-full text-sm tabular-nums">
                 <thead className="text-left text-xs text-muted-foreground">
                   <tr>
-                    <th className="py-1 pr-2 font-medium">Step</th>
-                    <th className="py-1 pr-2 font-medium">Reading</th>
+                    <th className="py-1 pr-2 font-medium">{t("Step")}</th>
+                    <th className="py-1 pr-2 font-medium">{t("Reading")}</th>
                     <th className="py-1 text-right font-medium">pH</th>
                   </tr>
                 </thead>
@@ -399,10 +400,10 @@ export default async function BrewPage(props: PageProps<"/brews/[id]">) {
                     const off = mashRelevant && v.targetMashPh != null && Math.abs(r.value - v.targetMashPh) > 0.2;
                     return (
                       <tr key={r.key}>
-                        <td className="py-1.5 pr-2 text-muted-foreground">{r.step}</td>
-                        <td className="py-1.5 pr-2">{r.label}</td>
+                        <td className="py-1.5 pr-2 text-muted-foreground">{t(r.step)}</td>
+                        <td className="py-1.5 pr-2">{t(r.label)}</td>
                         <td className="py-1.5 text-right font-semibold">
-                          {off && <span title={`Target mash pH ${v.targetMashPh}`}>⚠️ </span>}
+                          {off && <span title={t("Target mash pH {ph}", { ph: v.targetMashPh! })}>⚠️ </span>}
                           {r.value.toFixed(2)}
                         </td>
                       </tr>
@@ -411,16 +412,16 @@ export default async function BrewPage(props: PageProps<"/brews/[id]">) {
                 </tbody>
               </table>
             )}
-            {v.targetMashPh != null && <p className="mt-2 text-xs text-muted-foreground">Target mash pH {v.targetMashPh}</p>}
+            {v.targetMashPh != null && <p className="mt-2 text-xs text-muted-foreground">{t("Target mash pH {ph}", { ph: v.targetMashPh })}</p>}
           </Card>
 
           <Card>
-            <Stat label="Packaging" value={session.packagingMethod ?? "–"} />
+            <Stat label={t("Packaging")} value={session.packagingMethod ? t(session.packagingMethod) : "–"} />
           </Card>
 
-          <ActionForm action={deleteSession.bind(null, session.id)} confirm={`Delete ${title} and everything logged for it?`}>
+          <ActionForm action={deleteSession.bind(null, session.id)} confirm={t("Delete {name} and everything logged for it?", { name: title })}>
             <Button variant="danger" className="w-full">
-              Delete brew
+              {t("Delete brew")}
             </Button>
           </ActionForm>
         </div>

@@ -3,22 +3,27 @@ import { Button, ButtonLink, Card, Empty, PageHeader } from "@/components/ui";
 import { db } from "@/lib/db";
 import { abv, fmtAbv, fmtSg } from "@/lib/brewing";
 import { startBrew } from "../actions";
+import { getI18n } from "@/lib/i18n/server";
 
-export const metadata = { title: "New brew" };
+export async function generateMetadata() {
+  const { t } = await getI18n();
+  return { title: t("New brew") };
+}
 
 export default async function NewBrewPage() {
+  const { t } = await getI18n();
   const recipes = await db.recipe.findMany({
     orderBy: { updatedAt: "desc" },
     include: { versions: { orderBy: { version: "desc" }, take: 1 }, _count: { select: { sessions: true } } },
   });
   return (
     <>
-      <PageHeader title="Start a new brew" subtitle="Pick a recipe. The plan is copied into a new brew session; actuals start empty." />
+      <PageHeader title={t("Start a new brew")} subtitle={t("Pick a recipe. The plan is copied into a new brew session; actuals start empty.")} />
       {recipes.length === 0 ? (
         <Card>
-          <Empty>No recipes yet.</Empty>
+          <Empty>{t("No recipes yet.")}</Empty>
           <div className="text-center">
-            <ButtonLink href="/recipes/new">Create a recipe</ButtonLink>
+            <ButtonLink href="/recipes/new">{t("Create a recipe")}</ButtonLink>
           </div>
         </Card>
       ) : (
@@ -33,11 +38,11 @@ export default async function NewBrewPage() {
                     {r.name} <span className="text-xs font-normal text-muted-foreground">v{v.version}</span>
                   </div>
                   <div className="text-sm text-muted-foreground tabular-nums">
-                    {v.batchSize} L · OG {fmtSg(v.targetOg)} · {fmtAbv(abv(v.targetOg, v.targetFg))} · brewed {r._count.sessions}×
+                    {v.batchSize} L · OG {fmtSg(v.targetOg)} · {fmtAbv(abv(v.targetOg, v.targetFg))} · {t("brewed {n}×", { n: r._count.sessions })}
                   </div>
                 </div>
                 <ActionForm action={startBrew.bind(null, v.id)}>
-                  <Button>Brew</Button>
+                  <Button>{t("Brew")}</Button>
                 </ActionForm>
               </Card>
             );

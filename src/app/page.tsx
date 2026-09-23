@@ -2,8 +2,10 @@ import Link from "next/link";
 import { BrewList } from "@/components/brew-list";
 import { ButtonLink, Card, CardTitle, Empty, PageHeader } from "@/components/ui";
 import { db } from "@/lib/db";
+import { getI18n } from "@/lib/i18n/server";
 
 export default async function Dashboard() {
+  const { t } = await getI18n();
   const [recent, total, completed, fermenting, recipes, ingredients, lessons] = await Promise.all([
     db.brewSession.findMany({
       take: 5,
@@ -19,28 +21,28 @@ export default async function Dashboard() {
   ]);
 
   const stats = [
-    { label: "Total brews", value: total, href: "/brews" },
-    { label: "Completed", value: completed, href: "/brews?status=COMPLETED" },
-    { label: "Fermenting", value: fermenting, href: "/brews?status=FERMENTING" },
-    { label: "Recipes", value: recipes, href: "/recipes" },
+    { label: t("Total brews"), value: total, href: "/brews" },
+    { label: t("Completed"), value: completed, href: "/brews?status=COMPLETED" },
+    { label: t("Fermenting"), value: fermenting, href: "/brews?status=FERMENTING" },
+    { label: t("Recipes"), value: recipes, href: "/recipes" },
   ];
 
   return (
     <>
-      <PageHeader title="🍺 Brewing Journal" actions={<ButtonLink href="/brews/new">+ New brew</ButtonLink>} />
+      <PageHeader title={`🍺 ${t("Brewing Journal")}`} actions={<ButtonLink href="/brews/new">{t("+ New brew")}</ButtonLink>} />
 
       {ingredients === 0 && (
         <Card className="mb-4 border-warning-border bg-warning-bg text-sm">
-          <strong>Getting started:</strong> add your{" "}
-          <Link className="underline" href="/equipment/new">equipment</Link>, then{" "}
-          <Link className="underline" href="/ingredients/new">ingredients</Link>, then create a{" "}
-          <Link className="underline" href="/recipes/new">recipe</Link> and press Brew.
+          <strong>{t("Getting started:")}</strong> {t("add your")}{" "}
+          <Link className="underline" href="/equipment/new">{t("equipment")}</Link>, {t("then")}{" "}
+          <Link className="underline" href="/ingredients/new">{t("ingredients")}</Link>, {t("then create a")}{" "}
+          <Link className="underline" href="/recipes/new">{t("recipe")}</Link> {t("and press Brew.")}
         </Card>
       )}
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {stats.map((s) => (
-          <Link key={s.label} href={s.href}>
+          <Link key={s.href} href={s.href}>
             <Card className="hover:bg-muted/50">
               <div className="text-2xl font-bold tabular-nums">{s.value}</div>
               <div className="text-xs text-muted-foreground">{s.label}</div>
@@ -51,13 +53,13 @@ export default async function Dashboard() {
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="md:col-span-2">
-          <CardTitle action={<Link className="text-sm underline" href="/brews">All brews</Link>}>Recent brews</CardTitle>
-          {recent.length === 0 ? <Empty>No brews yet.</Empty> : <BrewList brews={recent} />}
+          <CardTitle action={<Link className="text-sm underline" href="/brews">{t("All brews")}</Link>}>{t("Recent brews")}</CardTitle>
+          {recent.length === 0 ? <Empty>{t("No brews yet.")}</Empty> : <BrewList brews={recent} />}
         </Card>
         <Card>
-          <CardTitle action={<Link className="text-sm underline" href="/lessons">All</Link>}>Latest lessons</CardTitle>
+          <CardTitle action={<Link className="text-sm underline" href="/lessons">{t("All")}</Link>}>{t("Latest lessons")}</CardTitle>
           {lessons.length === 0 ? (
-            <Empty>Lessons you log will show up here.</Empty>
+            <Empty>{t("Lessons you log will show up here.")}</Empty>
           ) : (
             <ul className="flex flex-col gap-2 text-sm">
               {lessons.map((l) => (

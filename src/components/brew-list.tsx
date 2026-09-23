@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { StatusBadge } from "@/components/status-badge";
-import { abv, batchLabel, fmtAbv, fmtDate, fmtSg } from "@/lib/brewing";
+import { abv, batchLabel, fmtAbv, fmtSg } from "@/lib/brewing";
+import { getI18n } from "@/lib/i18n/server";
 import type { BrewStatus } from "@/generated/prisma/enums";
 
 export type BrewListItem = {
@@ -14,7 +15,8 @@ export type BrewListItem = {
   _count?: { problems: number };
 };
 
-export function BrewList({ brews }: { brews: BrewListItem[] }) {
+export async function BrewList({ brews }: { brews: BrewListItem[] }) {
+  const { date } = await getI18n();
   return (
     <ul className="divide-y divide-border">
       {brews.map((b) => (
@@ -23,7 +25,7 @@ export function BrewList({ brews }: { brews: BrewListItem[] }) {
             <div className="min-w-0 flex-1">
               <div className="font-semibold">{batchLabel(b.recipe.name, b.batchNumber)}</div>
               <div className="text-xs text-muted-foreground">
-                {fmtDate(b.brewDate)}
+                {date(b.brewDate)}
                 {b.recipe.style && ` · ${b.recipe.style}`}
               </div>
             </div>

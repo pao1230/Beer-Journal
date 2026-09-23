@@ -4,13 +4,14 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { run } from "@/lib/action";
+import { UserError } from "@/lib/user-error";
 import { num, required, str, type ActionState } from "@/lib/form";
 import { INGREDIENT_TYPES, UNITS } from "@/lib/brewing";
 import { WATER_SALTS } from "@/lib/calc";
 import type { IngredientType } from "@/generated/prisma/enums";
 
 function oneOf(value: string | null, allowed: string[], name: string) {
-  if (value != null && !allowed.includes(value)) throw new Error(`Unknown ${name}`);
+  if (value != null && !allowed.includes(value)) throw new UserError("Unknown {name}", { name });
   return value;
 }
 
@@ -61,7 +62,7 @@ export async function deleteIngredient(id: number, _: ActionState) {
   return run(async () => {
     const used = await db.recipeIngredient.count({ where: { ingredientId: id } });
     if (used > 0) {
-      throw new Error(`Used in ${used} recipe line(s) — archive it instead so history stays intact.`);
+      throw new UserError("Used in {n} recipe line(s) — archive it instead so history stays intact.", { n: used });
     }
     await db.ingredient.delete({ where: { id } });
     revalidatePath("/ingredients");

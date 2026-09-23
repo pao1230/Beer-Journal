@@ -1,6 +1,9 @@
+"use client";
+
 import { fmtAbv, fmtSg } from "@/lib/brewing";
 import { IONS, type calcRecipe } from "@/lib/calc";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/lib/i18n/client";
 
 type Calc = ReturnType<typeof calcRecipe>;
 
@@ -28,14 +31,15 @@ export function CalcTable({
   targets: { og: number | null; fg: number | null; ibu: number | null; srm: number | null };
   className?: string;
 }) {
+  const { t } = useI18n();
   return (
     <div className={cn("text-sm", className)}>
       <table className="w-full">
         <thead className="text-xs text-muted-foreground">
           <tr>
             <th />
-            <th className="pb-1 pr-3 text-right font-medium">Calculated</th>
-            <th className="pb-1 text-right font-medium">Target</th>
+            <th className="pb-1 pr-3 text-right font-medium">{t("Calculated")}</th>
+            <th className="pb-1 text-right font-medium">{t("Target")}</th>
           </tr>
         </thead>
         <tbody>
@@ -46,11 +50,11 @@ export function CalcTable({
           <Row label="SRM (Morey)" est={n(calc.srm)} target={n(targets.srm)} />
         </tbody>
       </table>
-      <p className="mt-2 text-xs text-muted-foreground">At {calc.efficiency}% brewhouse efficiency.</p>
+      <p className="mt-2 text-xs text-muted-foreground">{t("At {n}% brewhouse efficiency.", { n: calc.efficiency })}</p>
       {calc.water && (
         <>
           <h3 className="mt-4 mb-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-            Water from salts (ppm, {calc.water.litres.toFixed(1)} L)
+            {t("Water from salts (ppm, {n} L)", { n: calc.water.litres.toFixed(1) })}
           </h3>
           <div className="grid grid-cols-6 gap-1 text-center tabular-nums">
             {IONS.map((ion) => (
@@ -61,15 +65,15 @@ export function CalcTable({
             ))}
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            SO₄:Cl {calc.water.sulfateToChloride == null ? "–" : calc.water.sulfateToChloride.toFixed(2)} · assumes RO or
-            distilled base water
+            SO₄:Cl {calc.water.sulfateToChloride == null ? "–" : calc.water.sulfateToChloride.toFixed(2)} ·{" "}
+            {t("assumes RO or distilled base water")}
           </p>
         </>
       )}
       {calc.warnings.length > 0 && (
         <ul className="mt-3 list-disc pl-4 text-xs text-muted-foreground">
           {calc.warnings.map((w) => (
-            <li key={w}>{w}</li>
+            <li key={w.key + JSON.stringify(w.vars ?? {})}>{t(w.key, w.vars)}</li>
           ))}
         </ul>
       )}

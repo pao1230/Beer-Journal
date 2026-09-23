@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui";
 import { labelOf, STATUSES } from "@/lib/brewing";
 import { cn } from "@/lib/utils";
+import { getI18n } from "@/lib/i18n/server";
 import type { BrewStatus } from "@/generated/prisma/enums";
 
 const colors: Record<BrewStatus, string> = {
@@ -12,6 +13,7 @@ const colors: Record<BrewStatus, string> = {
   CANCELLED: "bg-muted text-muted-foreground line-through",
 };
 
-export function StatusBadge({ status }: { status: BrewStatus }) {
-  return <Badge className={cn(colors[status])}>{labelOf(STATUSES, status)}</Badge>;
+export async function StatusBadge({ status }: { status: BrewStatus }) {
+  const { t } = await getI18n();
+  return <Badge className={cn(colors[status])}>{t(labelOf(STATUSES, status))}</Badge>;
 }

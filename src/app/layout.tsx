@@ -1,13 +1,19 @@
 import type { Metadata, Viewport } from "next";
 import { BottomNav, TopNav } from "@/components/nav";
+import { I18nProvider } from "@/lib/i18n/client";
+import { getI18n } from "@/lib/i18n/server";
 import "./globals.css";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: { default: "Brewing Journal", template: "%s · Brewing Journal" },
-  description: "Personal homebrewing journal: recipes, brew sessions, problems and lessons learned.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getI18n();
+  const name = t("Brewing Journal");
+  return {
+    title: { default: name, template: `%s · ${name}` },
+    description: t("Personal homebrewing journal: recipes, brew sessions, problems and lessons learned."),
+  };
+}
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -15,13 +21,16 @@ export const viewport: Viewport = {
   themeColor: "#b45309",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const { locale } = await getI18n();
   return (
-    <html lang="en" className="h-full antialiased">
+    <html lang={locale} className="h-full antialiased">
       <body className="flex min-h-full flex-col font-sans">
-        <TopNav />
-        <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-6 pb-24 lg:pb-10">{children}</main>
-        <BottomNav />
+        <I18nProvider locale={locale}>
+          <TopNav />
+          <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-6 pb-24 lg:pb-10">{children}</main>
+          <BottomNav />
+        </I18nProvider>
       </body>
     </html>
   );
