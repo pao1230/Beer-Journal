@@ -58,6 +58,8 @@ model Ingredient {
   supplier     String?
   notes        String?
   isArchived   Boolean        @default(false)
+  // Starred: listed first in ingredient, stock and picker lists
+  isFavorite   Boolean        @default(false)
   // Grain
   color        Float? // °Lovibond
   potential    Float? // specific gravity per kg/L, e.g. 1.037

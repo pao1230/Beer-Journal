@@ -18,7 +18,7 @@ export async function editorOptions(extraIngredientIds: number[] = []) {
         attenuation: true,
         unfermentable: true,
       },
-      orderBy: { name: "asc" },
+      orderBy: [{ isFavorite: "desc" }, { name: "asc" }],
     }),
     db.equipmentProfile.findMany({
       select: { id: true, name: true, batchSize: true, efficiency: true, trubLoss: true },

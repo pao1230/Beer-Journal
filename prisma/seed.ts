@@ -2,10 +2,9 @@ import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient, type AdditionStage, type IngredientType } from "../src/generated/prisma/client";
 import { convertUnit } from "../src/lib/calc";
+import { STOCK_UNIT, importCatalog } from "../src/lib/catalog";
 
 const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) });
-
-const STOCK_UNIT: Record<IngredientType, string> = { GRAIN: "kg", HOP: "g", YEAST: "pkg", WATER: "g", OTHER: "g" };
 
 const STEP_TYPES = ["WATER_PREP", "MASHING", "SPARGING", "BOILING", "COOLING", "FERMENTATION", "PACKAGING"] as const;
 
@@ -228,7 +227,8 @@ async function main() {
     }),
   });
 
-  console.log("Seeded Sweet Stout recipe, brew #001, starter ingredients and inventory.");
+  const added = await importCatalog(db);
+  console.log(`Seeded Sweet Stout recipe, brew #001, starter ingredients (+${added} from the WAS Homebrew catalog) and inventory.`);
 }
 
 main()
