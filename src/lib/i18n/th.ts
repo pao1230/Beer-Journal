@@ -8,6 +8,9 @@ export const th: Record<string, string> = {
   "Personal homebrewing journal: recipes, brew sessions, problems and lessons learned.":
     "บันทึกการต้มเบียร์ส่วนตัว: สูตร การต้มแต่ละครั้ง ปัญหา และบทเรียนที่ได้",
   "Switch language": "เปลี่ยนภาษา",
+  "Menu": "เมนู",
+  "Open menu": "เปิดเมนู",
+  "Close menu": "ปิดเมนู",
   Dashboard: "ภาพรวม",
   Home: "หน้าแรก",
   Recipes: "สูตร",
