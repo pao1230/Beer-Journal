@@ -1,13 +1,15 @@
 import Link from "next/link";
-import { Badge, Button, ButtonLink, Card, Empty, Input, PageHeader, Select } from "@/components/ui";
+import { Badge, Button, ButtonLink, Card, Empty, Input, PageHeader } from "@/components/ui";
+import { FavoriteButton } from "@/components/favorite-button";
+import { TypeChips } from "@/components/type-chips";
 import { ActionForm } from "@/components/action-form";
 import { db } from "@/lib/db";
 import { INGREDIENT_TYPES, labelOf } from "@/lib/brewing";
 import type { Prisma } from "@/generated/prisma/client";
-import type { IngredientType } from "@/generated/prisma/enums";
 import { getI18n } from "@/lib/i18n/server";
 import { CATALOG_SUPPLIERS, missingFromCatalog } from "@/lib/catalog";
-import { importStarterCatalog } from "./actions";
+import { parseTypes } from "@/lib/list-filter";
+import { importStarterCatalog, setFavorite } from "./actions";
 
 export async function generateMetadata() {
   const { t } = await getI18n();
@@ -36,11 +38,11 @@ export default async function IngredientsPage(props: PageProps<"/ingredients">) 
   const { t } = await getI18n();
   const sp = await props.searchParams;
   const q = typeof sp.q === "string" ? sp.q.trim() : "";
-  const type = INGREDIENT_TYPES.find((x) => x.value === sp.type)?.value as IngredientType | undefined;
+  const types = parseTypes(sp.type);
   const showArchived = sp.archived === "1";
 
   const where: Prisma.IngredientWhereInput = {
-    ...(type && { type }),
+    ...(types.length > 0 && { type: { in: types } }),
     ...(!showArchived && { isArchived: false }),
     ...(q && {
       OR: [
@@ -50,7 +52,10 @@ export default async function IngredientsPage(props: PageProps<"/ingredients">) 
       ],
     }),
   };
-  const ingredients = await db.ingredient.findMany({ where, orderBy: [{ type: "asc" }, { name: "asc" }] });
+  const ingredients = await db.ingredient.findMany({
+    where,
+    orderBy: [{ type: "asc" }, { isFavorite: "desc" }, { name: "asc" }],
+  });
   const missing = missingFromCatalog(
     await db.ingredient.findMany({ select: { name: true, type: true, waterSalt: true } }),
   ).length;
@@ -66,7 +71,7 @@ export default async function IngredientsPage(props: PageProps<"/ingredients">) 
             <ButtonLink href="/inventory" variant="secondary">
               {t("Inventory")}
             </ButtonLink>
-            <ButtonLink href={`/ingredients/new${type ? `?type=${type}` : ""}`}>{t("+ New ingredient")}</ButtonLink>
+            <ButtonLink href={`/ingredients/new${types.length === 1 ? `?type=${types[0]}` : ""}`}>{t("+ New ingredient")}</ButtonLink>
           </>
         }
       />
@@ -91,25 +96,25 @@ export default async function IngredientsPage(props: PageProps<"/ingredients">) 
           </ActionForm>
         </Card>
       )}
-      <form className="mb-4 flex flex-wrap gap-2">
+      <form className="mb-3 flex flex-wrap gap-2">
         <Input name="q" defaultValue={q} placeholder={t("Search name, brand, supplier")} className="max-w-xs" />
-        <Select name="type" defaultValue={type ?? ""} className="w-auto">
-          <option value="">{t("All types")}</option>
-          {INGREDIENT_TYPES.map((x) => (
-            <option key={x.value} value={x.value}>
-              {t(x.label)}
-            </option>
-          ))}
-        </Select>
+        {types.map((x) => (
+          <input key={x} type="hidden" name="type" value={x} />
+        ))}
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" name="archived" value="1" defaultChecked={showArchived} /> {t("Show archived")}
         </label>
         <button className="rounded-md border border-border px-3 text-sm hover:bg-muted">{t("Filter")}</button>
       </form>
+      <TypeChips
+        path="/ingredients"
+        params={{ q: q || undefined, archived: showArchived ? "1" : undefined }}
+        selected={types}
+      />
 
-      {INGREDIENT_TYPES.filter((x) => !type || x.value === type).map((x) => {
+      {INGREDIENT_TYPES.filter((x) => types.length === 0 || types.includes(x.value)).map((x) => {
         const rows = ingredients.filter((i) => i.type === x.value);
-        if (rows.length === 0 && (type || q)) return null;
+        if (rows.length === 0 && (types.length > 0 || q)) return null;
         return (
           <Card key={x.value} className="mb-4">
             <h2 className="mb-2 font-semibold">{t(labelOf(INGREDIENT_TYPES, x.value))}</h2>
@@ -123,10 +128,11 @@ export default async function IngredientsPage(props: PageProps<"/ingredients">) 
             ) : (
               <ul className="divide-y divide-border">
                 {rows.map((i) => (
-                  <li key={i.id}>
+                  <li key={i.id} className="flex items-center gap-1">
+                    <FavoriteButton isFavorite={i.isFavorite} action={setFavorite.bind(null, i.id)} name={i.name} />
                     <Link
                       href={`/ingredients/${i.id}/edit`}
-                      className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-2 hover:bg-muted/50"
+                      className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-1 py-2 hover:bg-muted/50"
                     >
                       <span className="font-medium">{i.name}</span>
                       {i.brand && <span className="text-sm text-muted-foreground">{i.brand}</span>}
@@ -140,7 +146,7 @@ export default async function IngredientsPage(props: PageProps<"/ingredients">) 
           </Card>
         );
       })}
-      {ingredients.length === 0 && (type || q) && <Empty>{t("No ingredients match.")}</Empty>}
+      {ingredients.length === 0 && (types.length > 0 || q) && <Empty>{t("No ingredients match.")}</Empty>}
     </>
   );
 }

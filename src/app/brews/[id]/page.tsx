@@ -79,7 +79,7 @@ export default async function BrewPage(props: PageProps<"/brews/[id]">) {
   const swapOptions = await db.ingredient.findMany({
     where: { isArchived: false },
     select: { id: true, name: true, type: true },
-    orderBy: { name: "asc" },
+    orderBy: [{ isFavorite: "desc" }, { name: "asc" }],
   });
   const warnings = gravityWarnings({
     targetOg: v.targetOg,

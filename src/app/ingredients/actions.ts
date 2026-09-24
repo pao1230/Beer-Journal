@@ -78,3 +78,9 @@ export async function importStarterCatalog(_: ActionState) {
     redirect(`/ingredients?imported=${added}`);
   });
 }
+
+export async function setFavorite(id: number, isFavorite: boolean) {
+  await db.ingredient.update({ where: { id }, data: { isFavorite } });
+  revalidatePath("/ingredients");
+  revalidatePath("/inventory");
+}
