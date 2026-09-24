@@ -8,6 +8,7 @@ import { UserError } from "@/lib/user-error";
 import { num, required, str, type ActionState } from "@/lib/form";
 import { INGREDIENT_TYPES, UNITS } from "@/lib/brewing";
 import { WATER_SALTS } from "@/lib/calc";
+import { importCatalog } from "@/lib/catalog";
 import type { IngredientType } from "@/generated/prisma/enums";
 
 function oneOf(value: string | null, allowed: string[], name: string) {
@@ -67,5 +68,13 @@ export async function deleteIngredient(id: number, _: ActionState) {
     await db.ingredient.delete({ where: { id } });
     revalidatePath("/ingredients");
     redirect("/ingredients");
+  });
+}
+
+export async function importStarterCatalog(_: ActionState) {
+  return run(async () => {
+    const added = await importCatalog(db);
+    revalidatePath("/ingredients");
+    redirect(`/ingredients?imported=${added}`);
   });
 }

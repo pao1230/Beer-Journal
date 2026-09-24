@@ -1,10 +1,13 @@
 import Link from "next/link";
-import { Badge, ButtonLink, Card, Empty, Input, PageHeader, Select } from "@/components/ui";
+import { Badge, Button, ButtonLink, Card, Empty, Input, PageHeader, Select } from "@/components/ui";
+import { ActionForm } from "@/components/action-form";
 import { db } from "@/lib/db";
 import { INGREDIENT_TYPES, labelOf } from "@/lib/brewing";
 import type { Prisma } from "@/generated/prisma/client";
 import type { IngredientType } from "@/generated/prisma/enums";
 import { getI18n } from "@/lib/i18n/server";
+import { CATALOG_SUPPLIER, missingFromCatalog } from "@/lib/catalog";
+import { importStarterCatalog } from "./actions";
 
 export async function generateMetadata() {
   const { t } = await getI18n();
@@ -48,6 +51,10 @@ export default async function IngredientsPage(props: PageProps<"/ingredients">) 
     }),
   };
   const ingredients = await db.ingredient.findMany({ where, orderBy: [{ type: "asc" }, { name: "asc" }] });
+  const missing = missingFromCatalog(
+    await db.ingredient.findMany({ select: { name: true, type: true, waterSalt: true } }),
+  ).length;
+  const imported = typeof sp.imported === "string" ? Number(sp.imported) : null;
 
   return (
     <>
@@ -62,6 +69,27 @@ export default async function IngredientsPage(props: PageProps<"/ingredients">) 
           </>
         }
       />
+      {imported != null && (
+        <p role="status" className="mb-4 rounded-md border border-border bg-muted px-3 py-2 text-sm">
+          {t("Added {n} ingredient(s) from {supplier}.", { n: imported, supplier: CATALOG_SUPPLIER })}
+        </p>
+      )}
+      {missing > 0 && (
+        <Card className="mb-4 flex flex-wrap items-center gap-3">
+          <p className="min-w-0 flex-1 text-sm">
+            <span className="font-medium">{t("Starter ingredients")}</span>
+            <span className="block text-muted-foreground">
+              {t("{n} malts, hops, yeasts and water salts from {supplier} aren't in your list yet.", {
+                n: missing,
+                supplier: CATALOG_SUPPLIER,
+              })}
+            </span>
+          </p>
+          <ActionForm action={importStarterCatalog}>
+            <Button variant="secondary">{t("Add them")}</Button>
+          </ActionForm>
+        </Card>
+      )}
       <form className="mb-4 flex flex-wrap gap-2">
         <Input name="q" defaultValue={q} placeholder={t("Search name, brand, supplier")} className="max-w-xs" />
         <Select name="type" defaultValue={type ?? ""} className="w-auto">

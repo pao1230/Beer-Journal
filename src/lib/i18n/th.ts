@@ -11,6 +11,11 @@ export const th: Record<string, string> = {
   "Menu": "เมนู",
   "Open menu": "เปิดเมนู",
   "Close menu": "ปิดเมนู",
+  "Starter ingredients": "วัตถุดิบตั้งต้น",
+  "{n} malts, hops, yeasts and water salts from {supplier} aren't in your list yet.":
+    "มอลต์ ฮอปส์ ยีสต์ และเกลือปรับน้ำจาก {supplier} อีก {n} รายการ ยังไม่อยู่ในรายการของคุณ",
+  "Add them": "เพิ่มเลย",
+  "Added {n} ingredient(s) from {supplier}.": "เพิ่มวัตถุดิบจาก {supplier} แล้ว {n} รายการ",
   Dashboard: "ภาพรวม",
   Home: "หน้าแรก",
   Recipes: "สูตร",
