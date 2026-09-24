@@ -69,7 +69,7 @@ npm run dev                   # http://localhost:3000
 | `npm run db:deploy` | Apply migrations in production |
 | `npm run db:seed` | Seed sample data (skipped if the DB already has data) |
 
-Starter ingredients (malts, hops, yeasts and water salts from WAS Homebrew, Thailand) live in `src/lib/catalog.ts`. The seed adds them, and on an existing database the Ingredients page offers an **Add them** button that adds only the ones you don't have yet.
+Starter ingredients (166 malts, hops, yeasts, water salts and additives from the Thai shops WAS Homebrew and Craft Components) live in `src/lib/catalog-data.ts`. The seed adds them, and on an existing database the Ingredients page offers an **Add them** button that adds only the ones you don't have yet.
 
 ## Deploying
 

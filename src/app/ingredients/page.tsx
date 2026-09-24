@@ -6,7 +6,7 @@ import { INGREDIENT_TYPES, labelOf } from "@/lib/brewing";
 import type { Prisma } from "@/generated/prisma/client";
 import type { IngredientType } from "@/generated/prisma/enums";
 import { getI18n } from "@/lib/i18n/server";
-import { CATALOG_SUPPLIER, missingFromCatalog } from "@/lib/catalog";
+import { CATALOG_SUPPLIERS, missingFromCatalog } from "@/lib/catalog";
 import { importStarterCatalog } from "./actions";
 
 export async function generateMetadata() {
@@ -54,6 +54,7 @@ export default async function IngredientsPage(props: PageProps<"/ingredients">) 
   const missing = missingFromCatalog(
     await db.ingredient.findMany({ select: { name: true, type: true, waterSalt: true } }),
   ).length;
+  const shops = CATALOG_SUPPLIERS.join(" & ");
   const imported = typeof sp.imported === "string" ? Number(sp.imported) : null;
 
   return (
@@ -71,7 +72,7 @@ export default async function IngredientsPage(props: PageProps<"/ingredients">) 
       />
       {imported != null && (
         <p role="status" className="mb-4 rounded-md border border-border bg-muted px-3 py-2 text-sm">
-          {t("Added {n} ingredient(s) from {supplier}.", { n: imported, supplier: CATALOG_SUPPLIER })}
+          {t("Added {n} ingredient(s) from {supplier}.", { n: imported, supplier: shops })}
         </p>
       )}
       {missing > 0 && (
@@ -81,7 +82,7 @@ export default async function IngredientsPage(props: PageProps<"/ingredients">) 
             <span className="block text-muted-foreground">
               {t("{n} malts, hops, yeasts and water salts from {supplier} aren't in your list yet.", {
                 n: missing,
-                supplier: CATALOG_SUPPLIER,
+                supplier: shops,
               })}
             </span>
           </p>

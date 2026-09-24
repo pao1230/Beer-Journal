@@ -11,18 +11,21 @@ describe("ebcToLovibond", () => {
 
 describe("catalog data", () => {
   it("has unique names per type and usable values", () => {
+    expect(CATALOG.length).toBeGreaterThan(150);
     const keys = CATALOG.map((c) => `${c.type}:${c.name}`);
     expect(new Set(keys).size).toBe(keys.length);
     for (const c of CATALOG) {
       if (c.type === "GRAIN") expect(c.potential).toBeGreaterThan(1);
       if (c.type === "HOP") expect(c.alphaAcid).toBeGreaterThan(0);
       if (c.waterSalt) expect(Object.keys(WATER_SALTS)).toContain(c.waterSalt);
+      expect(c.suppliers.length).toBeGreaterThan(0);
     }
   });
 
   it("builds rows with Lovibond color, supplier and stock unit", () => {
     const [pils] = catalogRows(CATALOG.filter((c) => c.name === "Château Pilsen 2RS"));
-    expect(pils).toMatchObject({ color: 1.8, supplier: "WAS Homebrew", stockUnit: "kg", brand: "Castle Malting" });
+    expect(pils).toMatchObject({ color: 1.8, supplier: "WAS Homebrew, Craft Components", stockUnit: "kg", brand: "Castle Malting" });
+    expect(pils).not.toHaveProperty("suppliers");
     expect(pils).not.toHaveProperty("ebc");
     const [lactic] = catalogRows(CATALOG.filter((c) => c.name === "Lactic Acid"));
     expect(lactic.stockUnit).toBe("ml");
