@@ -93,7 +93,7 @@ async function main() {
     line(cacl2, 3, "g", "MASH", null, 6),
     line(caco3, 3, "g", "MASH", null, 7),
     line(magnum, 28, "g", "BOIL", 60, 8),
-    line(ekg, 28, "g", "BOIL", 43, 9),
+    line(ekg, 28, "g", "BOIL", 45, 9),
     line(nutrient, 1, "tsp", "BOIL", 20, 10),
     line(lactose, 500, "g", "BOIL", 5, 11),
     line(us05, 1, "pkg", "FERMENTATION", null, 12),

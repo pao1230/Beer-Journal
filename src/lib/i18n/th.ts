@@ -11,6 +11,7 @@ export const th: Record<string, string> = {
   "Menu": "เมนู",
   "Open menu": "เปิดเมนู",
   "Close menu": "ปิดเมนู",
+  "Loading…": "กำลังโหลด…",
   "Filter by type": "กรองตามประเภท",
   "Add to favorites": "เพิ่มในรายการโปรด",
   "Remove from favorites": "เอาออกจากรายการโปรด",

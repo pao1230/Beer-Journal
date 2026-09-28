@@ -52,13 +52,14 @@ export default async function IngredientsPage(props: PageProps<"/ingredients">) 
       ],
     }),
   };
-  const ingredients = await db.ingredient.findMany({
-    where,
-    orderBy: [{ type: "asc" }, { isFavorite: "desc" }, { name: "asc" }],
-  });
-  const missing = missingFromCatalog(
-    await db.ingredient.findMany({ select: { name: true, type: true, waterSalt: true } }),
-  ).length;
+  const [ingredients, all] = await Promise.all([
+    db.ingredient.findMany({
+      where,
+      orderBy: [{ type: "asc" }, { isFavorite: "desc" }, { name: "asc" }],
+    }),
+    db.ingredient.findMany({ select: { name: true, type: true, waterSalt: true } }),
+  ]);
+  const missing = missingFromCatalog(all).length;
   const shops = CATALOG_SUPPLIERS.join(" & ");
   const imported = typeof sp.imported === "string" ? Number(sp.imported) : null;
 
