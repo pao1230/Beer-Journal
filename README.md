@@ -56,6 +56,7 @@ docker compose up -d          # Postgres on localhost:5432 (or point DATABASE_UR
 npm install                   # also runs `prisma generate`
 npm run db:migrate            # create tables
 npm run db:seed               # optional: Sweet Stout recipe + brew #001 + starter ingredients
+npm run db:import-sweet-stout # optional: add just the Sweet Stout recipe + brew #001 to a database that already has data
 npm run dev                   # http://localhost:3000
 ```
 
