@@ -9,6 +9,7 @@ import {
   batchLabel,
   daysSince,
   fermentationSeries,
+  fmtFermentStep,
   fmtNum,
   fmtSg,
   PACKAGING_METHODS,
@@ -60,6 +61,7 @@ function targetsFor(
     targetMashPh: number | null;
     equipmentProfile: { boilOffRate: number; trubLoss: number } | null;
     mashSteps: { id: number; name: string; temperature: number; timeMin: number }[];
+    fermentationSteps: { name: string; temperature: number | null; days: number | null }[];
   },
   additions: Addition[],
   t: T,
@@ -114,6 +116,7 @@ function targetsFor(
     case "FERMENTATION":
       return {
         lines: [
+          ...v.fermentationSteps.map((f, i) => ({ label: `${i + 1}. ${f.name}`, value: fmtFermentStep(f, t) })),
           { label: t("Target OG"), value: fmtSg(v.targetOg) },
           { label: t("Target FG"), value: fmtSg(v.targetFg) },
         ],
@@ -182,7 +185,11 @@ export default async function StepPage(props: PageProps<"/brews/[id]/steps/[step
     include: {
       recipe: { select: { name: true } },
       recipeVersion: {
-        include: { equipmentProfile: true, mashSteps: { orderBy: { stepOrder: "asc" } } },
+        include: {
+          equipmentProfile: true,
+          mashSteps: { orderBy: { stepOrder: "asc" } },
+          fermentationSteps: { orderBy: { stepOrder: "asc" } },
+        },
       },
       ingredients: { orderBy: { sortOrder: "asc" }, include: { ingredient: { select: { type: true } } } },
     },

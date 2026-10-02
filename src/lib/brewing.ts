@@ -165,6 +165,18 @@ export function fmtNum(n: number | null | undefined, unit?: string) {
   return unit ? `${s} ${unit}` : s;
 }
 
+/** "19°C · 7 days" for a planned fermentation step; either part may be missing. */
+export function fmtFermentStep(
+  step: { temperature: number | null; days: number | null },
+  t: (key: string, vars?: Record<string, string | number>) => string,
+) {
+  const parts = [
+    step.temperature != null && `${fmtNum(step.temperature)}°C`,
+    step.days != null && t(step.days === 1 ? "{n} day" : "{n} days", { n: fmtNum(step.days) }),
+  ].filter(Boolean);
+  return parts.length ? parts.join(" · ") : "–";
+}
+
 export function fmtDate(d: Date, locale: "en" | "th" = "en") {
   return locale === "th"
     ? d.toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" })

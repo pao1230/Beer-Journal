@@ -1,10 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Trash2, ArrowUp, ArrowDown } from "lucide-react";
 import { ActionForm } from "@/components/action-form";
 import { Badge, Button, ButtonLink, Card, CardTitle, Field, Input, Select, Textarea } from "@/components/ui";
-import { abv, DEFAULT_STAGE, DEFAULT_UNIT, fmtAbv, INGREDIENT_TYPES, STAGES, UNITS } from "@/lib/brewing";
+import { abv, DEFAULT_STAGE, DEFAULT_UNIT, fmtAbv, fmtNum, INGREDIENT_TYPES, STAGES, UNITS } from "@/lib/brewing";
+import { shortages, type Stock } from "@/lib/inventory";
+import { NewIngredientsDialog, type NewItem, type NewItemResult } from "./new-ingredients-dialog";
 import { calcRecipe } from "@/lib/calc";
 import { CalcTable } from "@/components/calc-card";
 import { useI18n } from "@/lib/i18n/client";
@@ -25,11 +27,21 @@ export type PickerIngredient = {
   unfermentable: boolean;
 };
 
+/** Specs to give an ingredient created from an imported recipe. */
+export type NewIngredientSpecs = {
+  brand?: string | null;
+  alphaAcid?: number | null;
+  color?: number | null;
+  potential?: number | null;
+  attenuation?: number | null;
+  unfermentable?: boolean;
+};
+
 /** A row points at an existing ingredient, or carries a name to create when the recipe is saved. */
 export type IngredientRow = {
   key: string;
   ingredientId: number | null;
-  newIngredient?: { name: string; type: IngredientType };
+  newIngredient?: { name: string; type: IngredientType; specs?: NewIngredientSpecs };
   amount: string;
   unit: string;
   stage: AdditionStage;
@@ -38,6 +50,17 @@ export type IngredientRow = {
 };
 
 export type MashRow = { key: string; name: string; temperature: string; timeMin: string };
+
+export type FermentRow = { key: string; name: string; temperature: string; days: string; notes: string };
+
+/** Quick-add buttons for the usual fermentation steps. */
+const FERMENT_PRESETS: { name: string; temperature: string; days: string; notes?: string }[] = [
+  { name: "Primary", temperature: "19", days: "7" },
+  { name: "Diacetyl rest", temperature: "21", days: "2" },
+  { name: "Dry hop", temperature: "19", days: "4" },
+  { name: "Cold crash", temperature: "3", days: "2" },
+  { name: "Carbonate", temperature: "4", days: "5", notes: "11–12 PSI" },
+];
 
 export type RecipeInitial = {
   name: string;
@@ -57,6 +80,7 @@ export type RecipeInitial = {
   targetMashPh: number | null;
   ingredients: IngredientRow[];
   mashSteps: MashRow[];
+  fermentationSteps: FermentRow[];
 };
 
 let keySeq = 0;
@@ -74,6 +98,8 @@ export function RecipeEditor({
   equipment,
   versionInfo,
   cancelHref,
+  stock,
+  hiddenFields,
 }: {
   action: (prev: ActionState, fd: FormData) => Promise<ActionState>;
   initial: RecipeInitial;
@@ -81,10 +107,20 @@ export function RecipeEditor({
   equipment: { id: number; name: string; batchSize: number; efficiency: number; trubLoss: number }[];
   versionInfo?: { current: number; brewed: boolean };
   cancelHref: string;
+  /** Stock per ingredient id, for the "short in stock" list when confirming. */
+  stock?: Record<number, Pick<Stock, "stockUnit" | "onHand">>;
+  hiddenFields?: Record<string, string>;
 }) {
   const { t } = useI18n();
   const [rows, setRows] = useState<IngredientRow[]>(initial.ingredients);
   const [mash, setMash] = useState<MashRow[]>(initial.mashSteps);
+  const [ferment, setFerment] = useState<FermentRow[]>(initial.fermentationSteps);
+  const [newStock, setNewStock] = useState<{ name: string; type: IngredientType; amount: number }[]>([]);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  // Keys of new ingredients the brewer already confirmed in the popup.
+  const confirmed = useRef(new Set<string>());
+  const submitRef = useRef<HTMLButtonElement>(null);
+  const submitAfterRender = useRef(false);
   const [og, setOg] = useState(v(initial.targetOg));
   const [fg, setFg] = useState(v(initial.targetFg));
   const [batchSize, setBatchSize] = useState(v(initial.batchSize));
@@ -117,7 +153,8 @@ export function RecipeEditor({
     spargeWaterL: toNum(spargeWater),
     ingredients: rows.flatMap((r) => {
       const ing = r.ingredientId != null ? byId.get(r.ingredientId) : undefined;
-      const specs = ing ?? (r.newIngredient && { ...NO_SPECS, ...r.newIngredient });
+      const specs =
+        ing ?? (r.newIngredient && { ...NO_SPECS, ...r.newIngredient.specs, name: r.newIngredient.name, type: r.newIngredient.type });
       const amount = toNum(r.amount);
       if (!specs || amount == null) return [];
       return [{ ...specs, amount, unit: r.unit, stage: r.stage, additionTime: toNum(r.additionTime) }];
@@ -147,6 +184,57 @@ export function RecipeEditor({
     setRows((r) => r.map((row) => (row.key === key ? { ...row, ...patch } : row)));
   const updateMash = (key: string, patch: Partial<MashRow>) =>
     setMash((m) => m.map((row) => (row.key === key ? { ...row, ...patch } : row)));
+  const updateFerment = (key: string, patch: Partial<FermentRow>) =>
+    setFerment((m) => m.map((row) => (row.key === key ? { ...row, ...patch } : row)));
+  const fermentDays = ferment.reduce((sum, f) => sum + (toNum(f.days) ?? 0), 0);
+
+  // Ingredients the save would create, one entry per distinct name.
+  const newItems = useMemo(() => {
+    const out = new Map<string, NewItem>();
+    for (const r of rows) {
+      if (!r.newIngredient) continue;
+      const key = `${r.newIngredient.type}|${r.newIngredient.name.trim().toLowerCase()}`;
+      const item = out.get(key) ?? { key, name: r.newIngredient.name, type: r.newIngredient.type, uses: 0 };
+      item.uses++;
+      out.set(key, item);
+    }
+    return [...out.values()];
+  }, [rows]);
+  const short = stock
+    ? shortages(
+        rows.flatMap((r) => {
+          const amount = toNum(r.amount);
+          const ing = r.ingredientId != null ? byId.get(r.ingredientId) : undefined;
+          return ing && amount != null ? [{ ingredientId: ing.id, name: ing.name, amount, unit: r.unit }] : [];
+        }),
+        (id) => stock[id],
+      )
+    : [];
+
+  // Submit once the confirmed rows have been rendered into the hidden inputs.
+  useEffect(() => {
+    if (!submitAfterRender.current) return;
+    submitAfterRender.current = false;
+    submitRef.current?.form?.requestSubmit(submitRef.current);
+  }, [rows, newStock]);
+
+  function applyNewItems(results: NewItemResult[]) {
+    const byKey = new Map(results.map((r) => [r.key, r]));
+    setRows((list) =>
+      list.map((row) => {
+        if (!row.newIngredient) return row;
+        const res = byKey.get(`${row.newIngredient.type}|${row.newIngredient.name.trim().toLowerCase()}`);
+        if (!res) return row;
+        return res.matchId != null
+          ? { ...row, ingredientId: res.matchId, newIngredient: undefined }
+          : { ...row, newIngredient: { ...row.newIngredient, name: res.name, type: res.type } };
+      }),
+    );
+    setNewStock(results.flatMap((r) => (r.matchId == null && r.have != null ? [{ name: r.name, type: r.type, amount: r.have }] : [])));
+    for (const r of results) if (r.matchId == null) confirmed.current.add(`${r.type}|${r.name.trim().toLowerCase()}`);
+    setDialogOpen(false);
+    submitAfterRender.current = true;
+  }
   const move = <T,>(list: T[], idx: number, dir: -1 | 1) => {
     const next = [...list];
     const [item] = next.splice(idx, 1);
@@ -173,10 +261,40 @@ export function RecipeEditor({
     })),
   );
 
+  const serializedFerment = JSON.stringify(
+    ferment.map((f) => ({
+      name: f.name.trim(),
+      temperature: toNum(f.temperature),
+      days: toNum(f.days),
+      notes: f.notes.trim() || null,
+    })),
+  );
+
   return (
-    <ActionForm action={action} className="flex flex-col gap-4">
+    <ActionForm
+      action={action}
+      className="flex flex-col gap-4"
+      onBeforeSubmit={() => {
+        if (newItems.every((i) => confirmed.current.has(i.key))) return true;
+        setDialogOpen(true);
+        return false;
+      }}
+    >
       <input type="hidden" name="ingredients" value={serializedRows} />
       <input type="hidden" name="mashSteps" value={serializedMash} />
+      <input type="hidden" name="fermentationSteps" value={serializedFerment} />
+      <input type="hidden" name="newStock" value={JSON.stringify(newStock)} />
+      {Object.entries(hiddenFields ?? {}).map(([name, value]) => (
+        <input key={name} type="hidden" name={name} value={value} />
+      ))}
+      <NewIngredientsDialog
+        open={dialogOpen}
+        items={newItems}
+        ingredients={ingredients}
+        shortages={short}
+        onConfirm={applyNewItems}
+        onClose={() => setDialogOpen(false)}
+      />
 
       <Card>
         <CardTitle>{t("Basics")}</CardTitle>
@@ -403,6 +521,61 @@ export function RecipeEditor({
       </Card>
 
       <Card>
+        <CardTitle>{t("Fermentation & conditioning")}</CardTitle>
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {FERMENT_PRESETS.map((p) => (
+            <Button
+              key={p.name}
+              type="button"
+              variant="secondary"
+              className="min-h-8 px-2 text-xs"
+              onClick={() => setFerment((f) => [...f, { key: newKey(), notes: "", ...p, name: t(p.name) }])}
+            >
+              + {t(p.name)}
+            </Button>
+          ))}
+          <Button
+            type="button"
+            variant="ghost"
+            className="min-h-8 px-2 text-xs"
+            onClick={() => setFerment((f) => [...f, { key: newKey(), name: "", temperature: "", days: "", notes: "" }])}
+          >
+            {t("+ Step")}
+          </Button>
+        </div>
+        {ferment.length === 0 && <p className="text-sm text-muted-foreground">{t("No fermentation plan yet — add the steps above.")}</p>}
+        <ol className="flex flex-col gap-2">
+          {ferment.map((f, idx) => (
+            <li
+              key={f.key}
+              className="grid grid-cols-[1.5rem_minmax(0,1fr)_auto] items-center gap-2 sm:grid-cols-[1.5rem_minmax(0,1fr)_4.5rem_4.5rem_minmax(0,1fr)_auto]"
+            >
+              <span className="text-sm text-muted-foreground">{idx + 1}.</span>
+              <Input aria-label={t("Step name")} placeholder={t("Primary")} required value={f.name} onChange={(e) => updateFerment(f.key, { name: e.target.value })} />
+              {/* Phones: temperature, days and notes go on a second row under the name. */}
+              <div className="col-span-2 col-start-2 row-start-2 grid grid-cols-[4.5rem_4.5rem_minmax(0,1fr)] gap-2 sm:contents">
+                <Input aria-label={t("Temperature °C")} type="number" step="0.1" placeholder="°C" value={f.temperature} onChange={(e) => updateFerment(f.key, { temperature: e.target.value })} />
+                <Input aria-label={t("Days")} type="number" step="0.5" min="0" placeholder={t("days")} value={f.days} onChange={(e) => updateFerment(f.key, { days: e.target.value })} />
+                <Input aria-label={t("Notes")} placeholder={t("Notes")} value={f.notes} onChange={(e) => updateFerment(f.key, { notes: e.target.value })} />
+              </div>
+              <div className="col-start-3 row-start-1 flex sm:col-start-auto sm:row-start-auto">
+                <Button type="button" variant="ghost" aria-label={t("Move up")} disabled={idx === 0} onClick={() => setFerment((r) => move(r, idx, -1))}>
+                  <ArrowUp className="size-4" />
+                </Button>
+                <Button type="button" variant="ghost" aria-label={t("Remove step")} onClick={() => setFerment((list) => list.filter((x) => x.key !== f.key))}>
+                  <Trash2 className="size-4" />
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ol>
+        {fermentDays > 0 && (
+          <p className="mt-2 text-xs text-muted-foreground">{t("About {n} days from brew day to ready.", { n: fmtNum(fermentDays) })}</p>
+        )}
+        <p className="mt-1 text-xs text-muted-foreground">{t("Dry hop amounts go in the ingredient list with stage Dry hop and the day to add them.")}</p>
+      </Card>
+
+      <Card>
         <CardTitle>{t("Water")}</CardTitle>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <Field label={t("Source")}>
@@ -458,7 +631,9 @@ export function RecipeEditor({
       </Card>
 
       <div className="flex gap-2">
-        <Button type="submit">{t("Save recipe")}</Button>
+        <Button type="submit" ref={submitRef}>
+          {t("Save recipe")}
+        </Button>
         <ButtonLink href={cancelHref} variant="secondary">
           {t("Cancel")}
         </ButtonLink>

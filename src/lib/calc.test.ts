@@ -3,6 +3,8 @@ import {
   brewhouseEfficiency,
   calcRecipe,
   convertUnit,
+  kegPsi,
+  strikeTemp,
   moreySrm,
   primingSugar,
   residualCo2,
@@ -132,5 +134,15 @@ describe("sugars and lactose", () => {
   it("leaves kettle sugar out of mash efficiency", () => {
     const og = calcRecipe({ ...base, ingredients: [paleAle, lactose] }).og!;
     expect(brewhouseEfficiency(og, 20, [paleAle, lactose])).toBeCloseTo(72, 1);
+  });
+});
+
+describe("carbonation and mash helpers", () => {
+  it("matches a force-carb chart", () => {
+    expect(kegPsi(4, 2.5)).toBeCloseTo(11.9, 1);
+    expect(kegPsi(2, 2.4)).toBeCloseTo(9.0, 1);
+  });
+  it("heats strike water above the mash temp", () => {
+    expect(strikeTemp(65, 28, 3)).toBeCloseTo(70.06, 1);
   });
 });

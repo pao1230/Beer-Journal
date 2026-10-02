@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { lineCost, shortfall, summarize } from "./inventory";
+import { lineCost, shortages, shortfall, summarize } from "./inventory";
 
 const rows = [
   { ingredientId: 1, amount: 25, totalCost: 1250, reason: "PURCHASE" }, // 50/kg
@@ -25,5 +25,25 @@ describe("inventory", () => {
     expect(shortfall(4200, "g", stock.get(1))).toBe(0);
     expect(shortfall(50, "kg", stock.get(1))).toBeCloseTo(4.2);
     expect(shortfall(1, "pkg", undefined)).toBeNull();
+  });
+});
+
+describe("shortages", () => {
+  it("totals lines per ingredient in its stock unit", () => {
+    const stock = new Map([
+      [1, { stockUnit: "g", onHand: 40 }],
+      [2, { stockUnit: "kg", onHand: 10 }],
+      [3, { stockUnit: null, onHand: 0 }],
+    ]);
+    const out = shortages(
+      [
+        { ingredientId: 1, name: "Citra", amount: 25, unit: "g" },
+        { ingredientId: 1, name: "Citra", amount: 25, unit: "g" },
+        { ingredientId: 2, name: "Pale", amount: 5200, unit: "g" },
+        { ingredientId: 3, name: "Untracked", amount: 1, unit: "pkg" },
+      ],
+      (id) => stock.get(id),
+    );
+    expect(out).toEqual([{ ingredientId: 1, name: "Citra", need: 50, have: 40, short: 10, unit: "g" }]);
   });
 });

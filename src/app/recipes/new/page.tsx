@@ -11,7 +11,7 @@ export async function generateMetadata() {
 
 export default async function NewRecipePage() {
   const { t } = await getI18n();
-  const { ingredients, equipment } = await editorOptions();
+  const { ingredients, equipment, stock } = await editorOptions();
   const eq = equipment[0];
   return (
     <>
@@ -20,6 +20,7 @@ export default async function NewRecipePage() {
         action={createRecipe}
         ingredients={ingredients}
         equipment={equipment}
+        stock={stock}
         cancelHref="/recipes"
         initial={{
           name: "",
@@ -41,6 +42,10 @@ export default async function NewRecipePage() {
           mashSteps: [
             { key: "m1", name: "Saccharification", temperature: "67", timeMin: "60" },
             { key: "m2", name: "Mash out", temperature: "75", timeMin: "10" },
+          ],
+          fermentationSteps: [
+            { key: "f1", name: t("Primary"), temperature: "19", days: "10", notes: "" },
+            { key: "f2", name: t("Cold crash"), temperature: "3", days: "2", notes: "" },
           ],
         }}
       />

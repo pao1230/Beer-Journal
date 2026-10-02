@@ -196,3 +196,29 @@ export function primingSugar(volumeL: number, targetCo2: number, maxFermentTempC
   const needed = Math.max(0, targetCo2 - residualCo2(maxFermentTempC));
   return needed * volumeL * PRIMING_SUGARS[sugar].gramsPerLitreVol;
 }
+
+/** Keg pressure (PSI, gauge) that holds `volumes` of CO2 in beer at `tempC` — the usual force-carb chart formula. */
+export function kegPsi(tempC: number, volumes: number) {
+  const f = (tempC * 9) / 5 + 32;
+  const psi =
+    -16.6999 - 0.0101059 * f + 0.00116512 * f * f + 0.173354 * f * volumes + 4.24267 * volumes - 0.0684226 * volumes * volumes;
+  return Math.max(0, psi);
+}
+
+/** Strike water temperature (°C) to land the mash at `mashTempC`; `ratio` is litres of water per kg of grain. */
+export function strikeTemp(mashTempC: number, grainTempC: number, ratio: number) {
+  return mashTempC + (0.41 / ratio) * (mashTempC - grainTempC);
+}
+
+// Beer color by whole SRM, 1–40 (darker beers use the last entry).
+const SRM_HEX = [
+  "#FFE699", "#FFD878", "#FFCA5A", "#FFBF42", "#FBB123", "#F8A600", "#F39C00", "#EA8F00", "#E58500", "#DE7C00",
+  "#D77200", "#CF6900", "#CB6200", "#C35900", "#BB5100", "#B54C00", "#B04500", "#A63E00", "#A13700", "#9B3200",
+  "#952D00", "#8E2900", "#882300", "#821E00", "#7B1A00", "#771900", "#701400", "#6A0E00", "#660D00", "#5E0B00",
+  "#5A0A02", "#600903", "#520907", "#4C0505", "#470606", "#440607", "#3F0708", "#3B0607", "#3A070B", "#36080A",
+];
+
+/** Approximate color of a beer at this SRM, for swatches. */
+export function srmColor(srm: number) {
+  return SRM_HEX[Math.min(SRM_HEX.length, Math.max(1, Math.round(srm))) - 1];
+}
