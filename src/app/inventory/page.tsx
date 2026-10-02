@@ -2,6 +2,8 @@ import Link from "next/link";
 import { Badge, ButtonLink, Card, Empty, Input, PageHeader } from "@/components/ui";
 import { FavoriteButton } from "@/components/favorite-button";
 import { TypeChips } from "@/components/type-chips";
+import { ActiveBrewBadges } from "@/components/active-brew-badges";
+import { loadActiveBrewUse } from "@/lib/active-brews";
 import { db } from "@/lib/db";
 import { fmtNum, INGREDIENT_TYPES, labelOf } from "@/lib/brewing";
 import { fmtMoney } from "@/lib/inventory";
@@ -22,14 +24,16 @@ export default async function InventoryPage(props: PageProps<"/inventory">) {
   const q = search.toLowerCase();
   const types = parseTypes(sp.type);
   const showOut = sp.out === "1";
+  const brewing = sp.brewing === "1";
 
-  const [ingredients, stock] = await Promise.all([
+  const [ingredients, stock, inUse] = await Promise.all([
     db.ingredient.findMany({
       where: { stockUnit: { not: null } },
       orderBy: [{ isFavorite: "desc" }, { type: "asc" }, { name: "asc" }],
       select: { id: true, name: true, type: true, brand: true, supplier: true, isArchived: true, isFavorite: true },
     }),
     loadStock(),
+    loadActiveBrewUse(),
   ]);
   const tracked = ingredients
     .map((i) => ({ ...i, stock: stock.get(i.id)! }))
@@ -41,12 +45,15 @@ export default async function InventoryPage(props: PageProps<"/inventory">) {
   const matching = tracked.filter(
     (r) =>
       (types.length === 0 || types.includes(r.type)) &&
+      (!brewing || inUse.has(r.id)) &&
       (!q || [r.name, r.brand, r.supplier].some((f) => f?.toLowerCase().includes(q))),
   );
-  // Out-of-stock items stay hidden unless asked for; favorites always show so they can be restocked.
-  const rows = matching.filter((r) => showOut || r.isFavorite || r.stock.onHand > 0);
+  // Out-of-stock items stay hidden unless asked for; favorites always show so they can be restocked,
+  // and so does anything a current brew needs.
+  const rows = matching.filter((r) => showOut || brewing || r.isFavorite || r.stock.onHand > 0);
   const hiddenOut = matching.length - rows.length;
-  const params = { q: search || undefined, out: showOut ? "1" : undefined };
+  const params = { q: search || undefined, out: showOut ? "1" : undefined, brewing: brewing ? "1" : undefined };
+  const inUseTracked = tracked.filter((r) => inUse.has(r.id)).length;
 
   return (
     <>
@@ -60,17 +67,18 @@ export default async function InventoryPage(props: PageProps<"/inventory">) {
         {types.map((x) => (
           <input key={x} type="hidden" name="type" value={x} />
         ))}
+        {brewing && <input type="hidden" name="brewing" value="1" />}
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" name="out" value="1" defaultChecked={showOut} /> {t("Show out of stock")}
         </label>
         <button className="rounded-md border border-border px-3 text-sm hover:bg-muted">{t("Filter")}</button>
       </form>
-      <TypeChips path="/inventory" params={params} selected={types} />
+      <TypeChips path="/inventory" params={params} selected={types} brewing={{ on: brewing, count: inUseTracked }} />
       <Card>
         {tracked.length === 0 ? (
           <Empty>{t("No ingredients are tracked yet. Set an inventory unit on an ingredient, then add a purchase.")}</Empty>
         ) : rows.length === 0 ? (
-          <Empty>{t("Nothing in stock matches.")}</Empty>
+          <Empty>{brewing ? t("No unfinished brews use any tracked ingredient.") : t("Nothing in stock matches.")}</Empty>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[22rem] sm:min-w-[28rem] text-sm tabular-nums">
@@ -97,6 +105,11 @@ export default async function InventoryPage(props: PageProps<"/inventory">) {
                         {r.name}
                       </Link>
                       {r.brand && <span className="ml-2 text-xs text-muted-foreground">{r.brand}</span>}
+                      {inUse.has(r.id) && (
+                        <div className="mt-1">
+                          <ActiveBrewBadges uses={inUse.get(r.id)} compact />
+                        </div>
+                      )}
                     </td>
                     <td className="hidden py-2 pr-3 text-muted-foreground sm:table-cell">{t(labelOf(INGREDIENT_TYPES, r.type))}</td>
                     <td className="py-2 pr-3 text-right">

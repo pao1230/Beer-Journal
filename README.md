@@ -56,7 +56,7 @@ batch learns from the last one. See [PLAN.md](PLAN.md) for the full product plan
 - **Thai / English UI** — ไทย/EN switch in the top bar (remembered in a cookie; first visit follows
   the browser language). Dates show in the Thai calendar in Thai. Brewing abbreviations (OG, FG,
   ABV, IBU, SRM, pH) and units stay as they are
-- Mobile bottom nav, installable web app manifest, optional basic auth
+- Mobile bottom nav, installable web app manifest
 
 ## Stack
 
@@ -88,9 +88,9 @@ Starter ingredients (166 malts, hops, yeasts, water salts and additives from the
 
 ## Deploying
 
-There is no login yet (single-user). **Before putting it on the internet, set
-`BASIC_AUTH_USER` and `BASIC_AUTH_PASSWORD`** — `src/proxy.ts` then requires HTTP basic auth on
-every page and server action.
+There is no login (single-user): anyone who has the app's address can see and change everything.
+Keep the address private, or put it behind your host's own access protection (e.g. Vercel
+Deployment Protection).
 
 Vercel + Supabase:
 
@@ -98,7 +98,6 @@ Vercel + Supabase:
 |---|---|
 | `DATABASE_URL` | Supabase transaction pooler URL (port 6543) — used by the app |
 | `DIRECT_URL` | Supabase session pooler URL (port 5432) — used by migrations |
-| `BASIC_AUTH_USER` / `BASIC_AUTH_PASSWORD` | your login |
 
 If you connect Supabase through Vercel's Supabase integration instead, nothing needs copying: the
 app also reads the integration's `POSTGRES_PRISMA_URL` / `POSTGRES_URL` (app) and

@@ -2,6 +2,8 @@ import Link from "next/link";
 import { Badge, Button, ButtonLink, Card, Empty, Input, PageHeader } from "@/components/ui";
 import { FavoriteButton } from "@/components/favorite-button";
 import { TypeChips } from "@/components/type-chips";
+import { ActiveBrewBadges } from "@/components/active-brew-badges";
+import { loadActiveBrewUse } from "@/lib/active-brews";
 import { ActionForm } from "@/components/action-form";
 import { db } from "@/lib/db";
 import { INGREDIENT_TYPES, labelOf } from "@/lib/brewing";
@@ -40,8 +42,11 @@ export default async function IngredientsPage(props: PageProps<"/ingredients">) 
   const q = typeof sp.q === "string" ? sp.q.trim() : "";
   const types = parseTypes(sp.type);
   const showArchived = sp.archived === "1";
+  const brewing = sp.brewing === "1";
+  const inUse = await loadActiveBrewUse();
 
   const where: Prisma.IngredientWhereInput = {
+    ...(brewing && { id: { in: [...inUse.keys()] } }),
     ...(types.length > 0 && { type: { in: types } }),
     ...(!showArchived && { isArchived: false }),
     ...(q && {
@@ -102,6 +107,7 @@ export default async function IngredientsPage(props: PageProps<"/ingredients">) 
         {types.map((x) => (
           <input key={x} type="hidden" name="type" value={x} />
         ))}
+        {brewing && <input type="hidden" name="brewing" value="1" />}
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" name="archived" value="1" defaultChecked={showArchived} /> {t("Show archived")}
         </label>
@@ -109,13 +115,14 @@ export default async function IngredientsPage(props: PageProps<"/ingredients">) 
       </form>
       <TypeChips
         path="/ingredients"
-        params={{ q: q || undefined, archived: showArchived ? "1" : undefined }}
+        params={{ q: q || undefined, archived: showArchived ? "1" : undefined, brewing: brewing ? "1" : undefined }}
         selected={types}
+        brewing={{ on: brewing, count: inUse.size }}
       />
 
       {INGREDIENT_TYPES.filter((x) => types.length === 0 || types.includes(x.value)).map((x) => {
         const rows = ingredients.filter((i) => i.type === x.value);
-        if (rows.length === 0 && (types.length > 0 || q)) return null;
+        if (rows.length === 0 && (types.length > 0 || q || brewing)) return null;
         return (
           <Card key={x.value} className="mb-4">
             <h2 className="mb-2 font-semibold">{t(labelOf(INGREDIENT_TYPES, x.value))}</h2>
@@ -131,15 +138,22 @@ export default async function IngredientsPage(props: PageProps<"/ingredients">) 
                 {rows.map((i) => (
                   <li key={i.id} className="flex items-center gap-1">
                     <FavoriteButton isFavorite={i.isFavorite} action={setFavorite.bind(null, i.id)} name={i.name} />
-                    <Link
-                      href={`/ingredients/${i.id}/edit`}
-                      className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-1 py-2 hover:bg-muted/50"
-                    >
-                      <span className="font-medium">{i.name}</span>
-                      {i.brand && <span className="text-sm text-muted-foreground">{i.brand}</span>}
-                      <span className="text-xs text-muted-foreground">{specs(i)}</span>
-                      {i.isArchived && <Badge>{t("Archived")}</Badge>}
-                    </Link>
+                    <div className="min-w-0 flex-1">
+                      <Link
+                        href={`/ingredients/${i.id}/edit`}
+                        className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-2 hover:bg-muted/50"
+                      >
+                        <span className="font-medium">{i.name}</span>
+                        {i.brand && <span className="text-sm text-muted-foreground">{i.brand}</span>}
+                        <span className="text-xs text-muted-foreground">{specs(i)}</span>
+                        {i.isArchived && <Badge>{t("Archived")}</Badge>}
+                      </Link>
+                      {inUse.has(i.id) && (
+                        <div className="-mt-1 pb-2">
+                          <ActiveBrewBadges uses={inUse.get(i.id)} />
+                        </div>
+                      )}
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -147,7 +161,9 @@ export default async function IngredientsPage(props: PageProps<"/ingredients">) 
           </Card>
         );
       })}
-      {ingredients.length === 0 && (types.length > 0 || q) && <Empty>{t("No ingredients match.")}</Empty>}
+      {ingredients.length === 0 && (types.length > 0 || q || brewing) && (
+        <Empty>{brewing ? t("No unfinished brews use any of these ingredients.") : t("No ingredients match.")}</Empty>
+      )}
     </>
   );
 }

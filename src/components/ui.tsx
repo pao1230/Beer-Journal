@@ -66,7 +66,7 @@ export function Field({
   children: ReactNode;
 }) {
   return (
-    <label className={cn("flex flex-col gap-1 text-sm", className)}>
+    <label className={cn("flex min-w-0 flex-col gap-1 text-sm", className)}>
       <span className="font-medium">{label}</span>
       {children}
       {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
