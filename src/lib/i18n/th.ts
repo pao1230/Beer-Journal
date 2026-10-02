@@ -768,4 +768,8 @@ export const th: Record<string, string> = {
   "{name}: have {have} · need {need} · short {short}": "{name}: มี {have} · ต้องใช้ {need} · ขาด {short}",
   "Back to edit": "กลับไปแก้ไข",
   "Confirm & save recipe": "ยืนยันและบันทึกสูตร",
+  // Ingredients used by unfinished brews
+  "In current brews ({n})": "ใช้ในการต้มที่ยังไม่เสร็จ ({n})",
+  "No unfinished brews use any of these ingredients.": "ไม่มีการต้มที่ยังไม่เสร็จใช้วัตถุดิบเหล่านี้",
+  "No unfinished brews use any tracked ingredient.": "ไม่มีการต้มที่ยังไม่เสร็จใช้วัตถุดิบที่ติดตามสต็อก",
 };

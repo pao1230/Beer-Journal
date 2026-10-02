@@ -22,10 +22,13 @@ export async function TypeChips({
   path,
   params,
   selected,
+  brewing,
 }: {
   path: string;
   params: Record<string, string | undefined>;
   selected: IngredientType[];
+  /** Adds an on/off chip for "used in unfinished brews" (the `brewing=1` param). */
+  brewing?: { on: boolean; count: number };
 }) {
   const { t } = await getI18n();
   return (
@@ -38,6 +41,16 @@ export async function TypeChips({
       >
         {t("All")}
       </Link>
+      {brewing && (
+        <Link
+          href={filterHref(path, { ...params, brewing: brewing.on ? undefined : "1" }, selected)}
+          scroll={false}
+          aria-pressed={brewing.on}
+          className={cn(chip, brewing.on ? "bg-primary font-medium text-primary-foreground" : off)}
+        >
+          🍺 {t("In current brews ({n})", { n: brewing.count })}
+        </Link>
+      )}
       {INGREDIENT_TYPES.map((x) => {
         const active = selected.includes(x.value);
         return (
