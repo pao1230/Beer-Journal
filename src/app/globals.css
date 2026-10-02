@@ -65,6 +65,15 @@ body {
 }
 
 @media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+  .recipe-sheet,
+  .recipe-sheet * {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
   :root {
     --background: #ffffff;
     --foreground: #000000;

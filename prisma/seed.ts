@@ -125,6 +125,12 @@ async function main() {
               { stepOrder: 1, name: "Mash out", temperature: 75, timeMin: 15 },
             ],
           },
+          fermentationSteps: {
+            create: [
+              { stepOrder: 0, name: "Primary", temperature: 19, days: 10 },
+              { stepOrder: 1, name: "Cold crash", temperature: 3, days: 2 },
+            ],
+          },
         },
       },
     },

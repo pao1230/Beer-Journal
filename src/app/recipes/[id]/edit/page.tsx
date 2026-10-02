@@ -24,6 +24,7 @@ export default async function EditRecipePage(props: PageProps<"/recipes/[id]/edi
             include: {
               ingredients: { orderBy: { sortOrder: "asc" } },
               mashSteps: { orderBy: { stepOrder: "asc" } },
+              fermentationSteps: { orderBy: { stepOrder: "asc" } },
               _count: { select: { sessions: true } },
             },
           },
@@ -33,7 +34,7 @@ export default async function EditRecipePage(props: PageProps<"/recipes/[id]/edi
   const latest = recipe?.versions[0];
   if (!recipe || !latest) notFound();
 
-  const { ingredients, equipment } = await editorOptions(latest.ingredients.map((i) => i.ingredientId));
+  const { ingredients, equipment, stock } = await editorOptions(latest.ingredients.map((i) => i.ingredientId));
   const s = (n: number | null) => (n == null ? "" : String(n));
 
   return (
@@ -43,6 +44,7 @@ export default async function EditRecipePage(props: PageProps<"/recipes/[id]/edi
         action={updateRecipe.bind(null, id)}
         ingredients={ingredients}
         equipment={equipment}
+        stock={stock}
         cancelHref={`/recipes/${id}`}
         versionInfo={{ current: latest.version, brewed: latest._count.sessions > 0 }}
         initial={{
@@ -75,6 +77,13 @@ export default async function EditRecipePage(props: PageProps<"/recipes/[id]/edi
             name: m.name,
             temperature: String(m.temperature),
             timeMin: String(m.timeMin),
+          })),
+          fermentationSteps: latest.fermentationSteps.map((f) => ({
+            key: `f${f.id}`,
+            name: f.name,
+            temperature: s(f.temperature),
+            days: s(f.days),
+            notes: f.notes ?? "",
           })),
         }}
       />

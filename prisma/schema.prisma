@@ -51,31 +51,31 @@ enum StepType {
 }
 
 model Ingredient {
-  id           Int            @id @default(autoincrement())
-  name         String
-  type         IngredientType
-  brand        String?
-  supplier     String?
-  notes        String?
-  isArchived   Boolean        @default(false)
+  id            Int            @id @default(autoincrement())
+  name          String
+  type          IngredientType
+  brand         String?
+  supplier      String?
+  notes         String?
+  isArchived    Boolean        @default(false)
   // Starred: listed first in ingredient, stock and picker lists
-  isFavorite   Boolean        @default(false)
+  isFavorite    Boolean        @default(false)
   // Grain
-  color        Float? // °Lovibond
-  potential    Float? // specific gravity per kg/L, e.g. 1.037
+  color         Float? // °Lovibond
+  potential     Float? // specific gravity per kg/L, e.g. 1.037
   // Hop / Yeast
-  alphaAcid    Float? // %
-  form         String? // hop: pellet/leaf/cryo · yeast: dry/liquid
-  attenuation  Float? // %
-  flocculation String?
+  alphaAcid     Float? // %
+  form          String? // hop: pellet/leaf/cryo · yeast: dry/liquid
+  attenuation   Float? // %
+  flocculation  String?
   // Sugars/lactose: true when yeast can't ferment it (stays in FG)
-  unfermentable Boolean       @default(false)
+  unfermentable Boolean        @default(false)
   // Water agent: which salt, for the water-profile calculator (CaCl2, CaSO4, MgSO4, NaHCO3, CaCO3, NaCl)
-  waterSalt    String?
+  waterSalt     String?
   // Inventory is tracked in this unit; stock and cost come from InventoryTransaction.
-  stockUnit    String?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  stockUnit     String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 
   recipeIngredients RecipeIngredient[]
   brewIngredients   BrewIngredient[]
@@ -132,9 +132,10 @@ model RecipeVersion {
   spargeWaterL       Float?
   targetMashPh       Float?
 
-  ingredients RecipeIngredient[]
-  mashSteps   MashStep[]
-  sessions    BrewSession[]
+  ingredients       RecipeIngredient[]
+  mashSteps         MashStep[]
+  fermentationSteps FermentationStep[]
+  sessions          BrewSession[]
 
   @@unique([recipeId, version])
 }
@@ -169,6 +170,20 @@ model MashStep {
   name            String
   temperature     Float // °C
   timeMin         Int
+
+  @@index([recipeVersionId])
+}
+
+/// Planned fermentation and conditioning, in order: primary, dry hop, cold crash, carbonation…
+model FermentationStep {
+  id              Int           @id @default(autoincrement())
+  recipeVersionId Int
+  recipeVersion   RecipeVersion @relation(fields: [recipeVersionId], references: [id], onDelete: Cascade)
+  stepOrder       Int
+  name            String
+  temperature     Float? // °C
+  days            Float?
+  notes           String?
 
   @@index([recipeVersionId])
 }

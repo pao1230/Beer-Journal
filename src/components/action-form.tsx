@@ -14,12 +14,15 @@ export function ActionForm({
   className,
   resetOnSuccess = false,
   confirm,
+  onBeforeSubmit,
 }: {
   action: (prev: ActionState, fd: FormData) => Promise<ActionState>;
   children: ReactNode;
   className?: string;
   resetOnSuccess?: boolean;
   confirm?: string;
+  /** Return false to hold the submit (e.g. to show a dialog first). */
+  onBeforeSubmit?: () => boolean;
 }) {
   const [state, formAction, pending] = useActionState(action, {});
   const ref = useRef<HTMLFormElement>(null);
@@ -35,6 +38,7 @@ export function ActionForm({
       onSubmit={(e) => {
         e.preventDefault();
         if (confirm && !window.confirm(confirm)) return;
+        if (onBeforeSubmit && !onBeforeSubmit()) return;
         const fd = new FormData(e.currentTarget);
         const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
         if (submitter?.name) fd.set(submitter.name, submitter.value);

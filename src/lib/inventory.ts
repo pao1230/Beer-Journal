@@ -44,3 +44,29 @@ export function summarize(
   for (const [id, unit] of units) if (!out.has(id)) out.set(id, { stockUnit: unit, onHand: 0, avgCost: null });
   return out;
 }
+
+export type Shortage = { ingredientId: number; name: string; need: number; have: number; short: number; unit: string };
+
+/**
+ * What a recipe needs that isn't in stock, totalled per ingredient in its stock unit (so three
+ * Citra additions count together). Untracked ingredients and incompatible units are skipped.
+ */
+export function shortages(
+  lines: { ingredientId: number; name: string; amount: number; unit: string }[],
+  stock: (id: number) => Pick<Stock, "stockUnit" | "onHand"> | undefined,
+): Shortage[] {
+  const need = new Map<number, { name: string; amount: number; unit: string; have: number }>();
+  for (const l of lines) {
+    const s = stock(l.ingredientId);
+    if (!s?.stockUnit) continue;
+    const amount = convertUnit(l.amount, l.unit, s.stockUnit);
+    if (amount == null) continue;
+    const n = need.get(l.ingredientId) ?? { name: l.name, amount: 0, unit: s.stockUnit, have: Math.max(0, s.onHand) };
+    n.amount += amount;
+    need.set(l.ingredientId, n);
+  }
+  return [...need].flatMap(([ingredientId, n]) => {
+    const short = n.amount - n.have;
+    return short > 1e-9 ? [{ ingredientId, name: n.name, need: n.amount, have: n.have, short, unit: n.unit }] : [];
+  });
+}

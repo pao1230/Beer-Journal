@@ -38,6 +38,21 @@ batch learns from the last one. See [PLAN.md](PLAN.md) for the full product plan
 - **Photos** on any brew step — resized in the browser, stored in Postgres (no external storage)
 - **Export** — CSV of all brews or one brew's full record (Excel-friendly UTF-8), and a printable
   report you can save as PDF (renders Thai correctly)
+- **Recipe sheet export** — a print-ready A4 recipe sheet (malts, yeast, hop totals, water and
+  strike temperature, mash & boil schedule, fermentation plan, kegging guide and serving-pressure
+  table) with a live preview: pick the version, scale the batch, Thai + English / Thai / English,
+  a **brew-day** style with checkboxes and blanks for readings, and real dates from a brew date.
+  Also downloads a recipe file (.json) and shares it to LINE on phones. Options are remembered
+- **Recipe import** — drop a PDF, a recipe file or paste text (Thai or English). Sheets exported
+  by this app carry a recipe code (and a QR code that opens the import screen), so they import
+  exactly; other PDFs and text are parsed and every guess (ranges, alternatives, hop totals that
+  don't add up, OG/IBU that don't match the ingredients) is listed for review in the normal
+  editor. Re-importing a recipe you already have can save as its next version
+- **New ingredients popup** — saving any recipe that would create ingredients first lists them:
+  fix the name, pick a similar existing ingredient instead, and record how much you already have.
+  Also shows what's short in stock
+- **Fermentation plan** — steps per recipe version (primary, dry hop, cold crash…) with quick-add
+  buttons; shown on the recipe, the brew's fermentation step and the printed sheet
 - **Thai / English UI** — ไทย/EN switch in the top bar (remembered in a cookie; first visit follows
   the browser language). Dates show in the Thai calendar in Thai. Brewing abbreviations (OG, FG,
   ABV, IBU, SRM, pH) and units stay as they are

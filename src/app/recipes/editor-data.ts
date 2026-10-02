@@ -1,8 +1,9 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { loadStock } from "@/lib/inventory-data";
 
 export async function editorOptions(extraIngredientIds: number[] = []) {
-  const [ingredients, equipment] = await Promise.all([
+  const [ingredients, equipment, stockMap] = await Promise.all([
     db.ingredient.findMany({
       where: { OR: [{ isArchived: false }, { id: { in: extraIngredientIds } }] },
       select: {
@@ -24,6 +25,8 @@ export async function editorOptions(extraIngredientIds: number[] = []) {
       select: { id: true, name: true, batchSize: true, efficiency: true, trubLoss: true },
       orderBy: { name: "asc" },
     }),
+    loadStock(),
   ]);
-  return { ingredients, equipment };
+  const stock = Object.fromEntries([...stockMap].map(([id, s]) => [id, { stockUnit: s.stockUnit, onHand: s.onHand }]));
+  return { ingredients, equipment, stock };
 }

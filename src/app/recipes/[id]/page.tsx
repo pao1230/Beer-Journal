@@ -1,11 +1,12 @@
 import Link from "next/link";
+import { FileDown } from "lucide-react";
 import { notFound } from "next/navigation";
 import { ActionForm } from "@/components/action-form";
 import { IngredientTable } from "@/components/ingredient-table";
 import { StatusBadge } from "@/components/status-badge";
 import { Badge, Button, ButtonLink, Card, CardTitle, Empty, PageHeader, Stat } from "@/components/ui";
 import { db } from "@/lib/db";
-import { abv, batchLabel, fmtAbv, fmtNum, fmtSg, preBoilVolume } from "@/lib/brewing";
+import { abv, batchLabel, fmtAbv, fmtFermentStep, fmtNum, fmtSg, preBoilVolume } from "@/lib/brewing";
 import { startBrew } from "@/app/brews/actions";
 import { deleteRecipe } from "../actions";
 import { CalcTable } from "@/components/calc-card";
@@ -46,6 +47,7 @@ export default async function RecipePage(props: PageProps<"/recipes/[id]">) {
       equipmentProfile: true,
       ingredients: { orderBy: { sortOrder: "asc" }, include: { ingredient: INGREDIENT_SPECS } },
       mashSteps: { orderBy: { stepOrder: "asc" } },
+      fermentationSteps: { orderBy: { stepOrder: "asc" } },
     },
   });
   const calc = calcVersion(version);
@@ -81,6 +83,9 @@ export default async function RecipePage(props: PageProps<"/recipes/[id]">) {
             </ButtonLink>
             <ButtonLink href={`/recipes/${recipe.id}/scale${isLatest ? "" : `?v=${version.version}`}`} variant="secondary">
               {t("Scale")}
+            </ButtonLink>
+            <ButtonLink href={`/recipes/${recipe.id}/export${isLatest ? "" : `?v=${version.version}`}`} variant="secondary">
+              <FileDown className="size-4" /> {t("Export")}
             </ButtonLink>
           </>
         }
@@ -168,6 +173,23 @@ export default async function RecipePage(props: PageProps<"/recipes/[id]">) {
               </dl>
             </Card>
           </div>
+
+          {version.fermentationSteps.length > 0 && (
+            <Card>
+              <CardTitle>{t("Fermentation & conditioning")}</CardTitle>
+              <ol className="flex flex-col gap-1 text-sm">
+                {version.fermentationSteps.map((f, idx) => (
+                  <li key={f.id} className="flex flex-wrap justify-between gap-x-2">
+                    <span>
+                      {idx + 1}. {f.name}
+                      {f.notes && <span className="ml-2 text-xs text-muted-foreground">{f.notes}</span>}
+                    </span>
+                    <span className="tabular-nums">{fmtFermentStep(f, t)}</span>
+                  </li>
+                ))}
+              </ol>
+            </Card>
+          )}
 
           {(recipe.notes || version.notes) && (
             <Card>

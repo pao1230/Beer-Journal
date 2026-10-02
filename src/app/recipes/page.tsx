@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FileUp } from "lucide-react";
 import { ButtonLink, Card, Empty, PageHeader } from "@/components/ui";
 import { db } from "@/lib/db";
 import { abv, fmtAbv, fmtSg } from "@/lib/brewing";
@@ -20,7 +21,14 @@ export default async function RecipesPage() {
   });
   return (
     <>
-      <PageHeader title={t("Recipes")} actions={<ButtonLink href="/recipes/new">{t("+ New recipe")}</ButtonLink>} />
+      <PageHeader title={t("Recipes")} actions={
+          <>
+            <ButtonLink href="/recipes/import" variant="secondary">
+              <FileUp className="size-4" /> {t("Import")}
+            </ButtonLink>
+            <ButtonLink href="/recipes/new">{t("+ New recipe")}</ButtonLink>
+          </>
+        } />
       {recipes.length === 0 ? (
         <Card>
           <Empty>{t("No recipes yet. Add a few ingredients first, then create your first recipe.")}</Empty>
