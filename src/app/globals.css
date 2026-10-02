@@ -64,6 +64,25 @@ body {
   color: var(--foreground);
 }
 
+/*
+ * iOS Safari draws date/time inputs at their own intrinsic width (overflowing narrow grid
+ * columns) and centres the value; make them size like every other field.
+ */
+input[type="date"],
+input[type="datetime-local"],
+input[type="time"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+  max-width: 100%;
+  display: block;
+  line-height: 2.5rem;
+}
+input::-webkit-date-and-time-value {
+  text-align: left;
+  min-height: 1.5em;
+}
+
 @media print {
   @page {
     size: A4;
