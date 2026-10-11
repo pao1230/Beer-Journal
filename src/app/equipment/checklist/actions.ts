@@ -22,6 +22,12 @@ function id(value: unknown) {
 
 const text = (value: unknown) => (typeof value === "string" ? value.trim() : "");
 
+function qty(value: unknown) {
+  if (value == null) return null;
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) throw new Error("Invalid amount");
+  return value;
+}
+
 export async function loadChecklist(): Promise<ChecklistSection[]> {
   const sections = await db.checklistSection.findMany({
     orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
@@ -31,22 +37,44 @@ export async function loadChecklist(): Promise<ChecklistSection[]> {
     id: s.id,
     title: s.title,
     description: s.description ?? "",
-    items: s.items.map((i) => ({ id: i.id, name: i.name, note: i.note ?? "", status: i.status })),
+    collapsed: s.collapsed,
+    items: s.items.map((i) => ({
+      id: i.id,
+      name: i.name,
+      note: i.note ?? "",
+      quantity: i.quantity,
+      unit: i.unit ?? "",
+      status: i.status,
+      missingQty: i.status === "MISSING" ? i.missingQty : null,
+    })),
   }));
 }
 
-export async function setItemStatus(itemId: number, status: ChecklistStatus) {
+/** `missingQty` is kept only with MISSING; any other status clears it. */
+export async function setItemStatus(itemId: number, status: ChecklistStatus, missingQty: number | null = null) {
   if (!STATUSES.includes(status)) throw new Error("Invalid status");
-  await db.checklistItem.update({ where: { id: id(itemId) }, data: { status } });
+  await db.checklistItem.update({
+    where: { id: id(itemId) },
+    data: { status, missingQty: status === "MISSING" ? qty(missingQty) : null },
+  });
 }
 
-/** "All here" for a section: only items not checked yet, so a missing one stays missing. */
-export async function markSectionOk(sectionId: number) {
-  await db.checklistItem.updateMany({ where: { sectionId: id(sectionId), status: "TODO" }, data: { status: "OK" } });
+export async function setMissingQty(itemId: number, missingQty: number | null) {
+  await db.checklistItem.update({ where: { id: id(itemId) }, data: { missingQty: qty(missingQty) } });
+}
+
+/**
+ * A section's toggle button. "check" ticks only items not checked yet, so a missing one stays
+ * missing; "clear" unticks every item in the section.
+ */
+export async function toggleSection(sectionId: number, mode: "check" | "clear") {
+  const where = { sectionId: id(sectionId) };
+  if (mode === "clear") await db.checklistItem.updateMany({ where, data: { status: "TODO", missingQty: null } });
+  else await db.checklistItem.updateMany({ where: { ...where, status: "TODO" }, data: { status: "OK" } });
 }
 
 export async function resetStatuses() {
-  await db.checklistItem.updateMany({ data: { status: "TODO" } });
+  await db.checklistItem.updateMany({ data: { status: "TODO", missingQty: null } });
 }
 
 export async function addSection(title: string) {
@@ -67,24 +95,47 @@ export async function updateSection(sectionId: number, data: { title?: string; d
   });
 }
 
+export async function setSectionCollapsed(sectionId: number, collapsed: boolean) {
+  await db.checklistSection.update({ where: { id: id(sectionId) }, data: { collapsed: collapsed === true } });
+}
+
+export async function setAllCollapsed(collapsed: boolean) {
+  await db.checklistSection.updateMany({ data: { collapsed: collapsed === true } });
+}
+
 export async function deleteSection(sectionId: number) {
   await db.checklistSection.delete({ where: { id: id(sectionId) } });
 }
 
-export async function addItem(sectionId: number, name: string, note: string) {
+export async function addItem(
+  sectionId: number,
+  data: { name: string; note: string; quantity: number | null; unit: string },
+) {
   const last = await db.checklistItem.aggregate({ where: { sectionId: id(sectionId) }, _max: { sortOrder: true } });
   const item = await db.checklistItem.create({
-    data: { sectionId, name: text(name), note: text(note) || null, sortOrder: (last._max.sortOrder ?? -1) + 1 },
+    data: {
+      sectionId,
+      name: text(data.name),
+      note: text(data.note) || null,
+      quantity: qty(data.quantity),
+      unit: text(data.unit) || null,
+      sortOrder: (last._max.sortOrder ?? -1) + 1,
+    },
   });
   return item.id;
 }
 
-export async function updateItem(itemId: number, data: { name?: string; note?: string }) {
+export async function updateItem(
+  itemId: number,
+  data: { name?: string; note?: string; quantity?: number | null; unit?: string },
+) {
   await db.checklistItem.update({
     where: { id: id(itemId) },
     data: {
       ...(data.name !== undefined && { name: text(data.name) }),
       ...(data.note !== undefined && { note: text(data.note) || null }),
+      ...(data.quantity !== undefined && { quantity: qty(data.quantity) }),
+      ...(data.unit !== undefined && { unit: text(data.unit) || null }),
     },
   });
 }
@@ -114,7 +165,15 @@ async function replaceAll(drafts: SectionDraft[]) {
           title: s.title,
           description: s.description || null,
           sortOrder: si,
-          items: { create: s.items.map((i, ii) => ({ name: i.name, note: i.note || null, sortOrder: ii })) },
+          items: {
+            create: s.items.map((i, ii) => ({
+              name: i.name,
+              note: i.note || null,
+              quantity: i.quantity,
+              unit: i.unit || null,
+              sortOrder: ii,
+            })),
+          },
         },
       });
     }

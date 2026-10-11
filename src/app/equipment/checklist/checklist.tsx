@@ -1,15 +1,21 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, ChevronsDownUp, ChevronsUpDown, Plus, X } from "lucide-react";
 import { Button, Card, Input, Textarea } from "@/components/ui";
 import { useI18n } from "@/lib/i18n/client";
 import {
+  applySectionToggle,
+  cycle,
   exportChecklist,
+  fmtQty,
   moveItem,
   moveSection,
-  nextStatus,
+  parseQty,
+  qtyText,
+  sectionToggle,
   summarize,
+  type ChecklistItem,
   type ChecklistSection,
   type ChecklistStatus,
 } from "@/lib/checklist";
@@ -104,24 +110,38 @@ function CheckView({ sections, setSections, persist, fail, onManage }: ViewProps
   const { t } = useI18n();
   const sum = summarize(sections);
 
-  function setStatus(itemId: number, status: ChecklistStatus) {
+  function patchItem(itemId: number, patch: Partial<ChecklistItem>) {
     setSections((prev) =>
-      prev.map((s) => ({ ...s, items: s.items.map((i) => (i.id === itemId ? { ...i, status } : i)) })),
+      prev.map((s) => ({ ...s, items: s.items.map((i) => (i.id === itemId ? { ...i, ...patch } : i)) })),
     );
-    persist(actions.setItemStatus(itemId, status));
   }
 
-  function allHere(sectionId: number) {
-    setSections((prev) =>
-      prev.map((s) =>
-        s.id === sectionId ? { ...s, items: s.items.map((i) => (i.status === "TODO" ? { ...i, status: "OK" } : i)) } : s,
-      ),
-    );
-    persist(actions.markSectionOk(sectionId));
+  function tap(item: ChecklistItem) {
+    const next = cycle(item);
+    patchItem(item.id, next);
+    persist(actions.setItemStatus(item.id, next.status, next.missingQty));
+  }
+
+  function toggle(section: ChecklistSection) {
+    const mode = sectionToggle(section);
+    setSections((prev) => prev.map((s) => (s.id === section.id ? applySectionToggle(s, mode) : s)));
+    persist(actions.toggleSection(section.id, mode));
+  }
+
+  function collapse(sectionId: number, collapsed: boolean) {
+    setSections((prev) => prev.map((s) => (s.id === sectionId ? { ...s, collapsed } : s)));
+    persist(actions.setSectionCollapsed(sectionId, collapsed));
+  }
+
+  function collapseAll(collapsed: boolean) {
+    setSections((prev) => prev.map((s) => ({ ...s, collapsed })));
+    persist(actions.setAllCollapsed(collapsed));
   }
 
   function reset() {
-    setSections((prev) => prev.map((s) => ({ ...s, items: s.items.map((i) => ({ ...i, status: "TODO" })) })));
+    setSections((prev) =>
+      prev.map((s) => ({ ...s, items: s.items.map((i) => ({ ...i, status: "TODO", missingQty: null })) })),
+    );
     persist(actions.resetStatuses());
     window.scrollTo(0, 0);
   }
@@ -177,64 +197,125 @@ function CheckView({ sections, setSections, persist, fail, onManage }: ViewProps
 
       {sum.missing.length > 0 && <ShoppingList missing={sum.missing} />}
 
+      <div className="mt-5 flex justify-end">
+        {sections.some((s) => s.collapsed) ? (
+          <Button variant="ghost" onClick={() => collapseAll(false)}>
+            <ChevronsUpDown className="size-4" />
+            {t("Expand all")}
+          </Button>
+        ) : (
+          <Button variant="ghost" onClick={() => collapseAll(true)}>
+            <ChevronsDownUp className="size-4" />
+            {t("Collapse all")}
+          </Button>
+        )}
+      </div>
+
       {sections.map((sec, si) => {
         const done = sec.items.filter((i) => i.status !== "TODO").length;
+        const missing = sec.items.filter((i) => i.status === "MISSING").length;
+        const bodyId = `section-body-${sec.id}`;
         return (
-          <section key={sec.id} className="mt-7">
-            <div className="flex flex-wrap items-baseline gap-3 border-b-2 border-foreground pb-2">
-              <span className="font-mono text-sm text-muted-foreground">{step(si)}</span>
-              <h2 className="min-w-0 flex-[1_1_12ch] text-xl font-semibold break-words">{sec.title || t("(untitled)")}</h2>
+          <section key={sec.id} className="mt-5">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b-2 border-foreground pb-2">
+              <button
+                type="button"
+                aria-expanded={!sec.collapsed}
+                aria-controls={bodyId}
+                onClick={() => collapse(sec.id, !sec.collapsed)}
+                className="-ml-1 flex min-h-10 min-w-0 flex-[1_1_15rem] items-baseline gap-3 rounded-md px-1 text-left hover:bg-card"
+              >
+                <ChevronDown
+                  aria-hidden
+                  className={cn(
+                    "size-5 shrink-0 self-center text-muted-foreground transition-transform motion-reduce:transition-none",
+                    sec.collapsed && "-rotate-90",
+                  )}
+                />
+                <span className="shrink-0 font-mono text-sm text-muted-foreground">{step(si)}</span>
+                <h2 className="min-w-0 text-xl font-semibold break-words text-primary">{sec.title || t("(untitled)")}</h2>
+              </button>
               <div className="ml-auto flex items-center gap-2.5">
+                {sec.collapsed && missing > 0 && (
+                  <Chip status="MISSING">
+                    <span className="font-mono text-xs">{t("Missing {n}", { n: missing })}</span>
+                  </Chip>
+                )}
                 <span className="font-mono text-sm text-muted-foreground tabular-nums">
                   {done}/{sec.items.length}
                 </span>
                 {sec.items.length > 0 && (
-                  <Button variant="secondary" onClick={() => allHere(sec.id)}>
-                    {t("All here")}
+                  <Button variant="secondary" onClick={() => toggle(sec)}>
+                    {t(sectionToggle(sec) === "check" ? "All here" : "Uncheck all")}
                   </Button>
                 )}
               </div>
             </div>
-            {sec.description && <p className="mt-2 text-sm text-muted-foreground break-words">{sec.description}</p>}
-            {sec.items.length === 0 ? (
-              <p className="mt-2.5 rounded-lg border border-dashed border-border p-3 text-sm text-muted-foreground">
-                {t("No items in this section yet. Add them under Manage list.")}
-              </p>
-            ) : (
-              <ul className="mt-2">
-                {sec.items.map((it) => (
-                  <li key={it.id}>
-                    <button
-                      type="button"
-                      onClick={() => setStatus(it.id, nextStatus(it.status))}
-                      aria-label={t("{name}, status: {status}", { name: it.name, status: t(LABEL[it.status]) })}
-                      className="grid min-h-13 w-full grid-cols-[40px_1fr] items-start gap-3 border-b border-border px-1 py-2.5 text-left hover:bg-card"
-                    >
-                      <span
-                        aria-hidden
-                        className={cn(
-                          "grid size-9 place-items-center rounded-lg border-2 font-mono text-lg font-semibold",
-                          BOX[it.status],
-                        )}
+            <div id={bodyId} hidden={sec.collapsed}>
+              {sec.description && <p className="mt-2 text-sm text-muted-foreground break-words">{sec.description}</p>}
+              {sec.items.length === 0 ? (
+                <p className="mt-2.5 rounded-lg border border-dashed border-border p-3 text-sm text-muted-foreground">
+                  {t("No items in this section yet. Add them under Manage list.")}
+                </p>
+              ) : (
+                <ul className="mt-2">
+                  {sec.items.map((it) => (
+                    <li key={it.id} className="border-b border-border">
+                      <button
+                        type="button"
+                        onClick={() => tap(it)}
+                        aria-label={t("{name}, status: {status}", { name: it.name, status: t(LABEL[it.status]) })}
+                        className="grid min-h-13 w-full grid-cols-[40px_1fr] items-start gap-3 px-1 py-2.5 text-left hover:bg-card"
                       >
-                        {GLYPH[it.status]}
-                      </span>
-                      <span className="min-w-0">
                         <span
+                          aria-hidden
                           className={cn(
-                            "block font-medium break-words",
-                            it.status === "SKIP" && "text-muted-foreground line-through decoration-border",
+                            "grid size-9 place-items-center rounded-lg border-2 font-mono text-lg font-semibold",
+                            BOX[it.status],
                           )}
                         >
-                          {it.name}
+                          {GLYPH[it.status]}
                         </span>
-                        {it.note && <span className="block text-sm text-muted-foreground break-words">{it.note}</span>}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+                        <span className="min-w-0">
+                          <span
+                            className={cn(
+                              "block font-medium break-words",
+                              it.status === "SKIP" && "text-muted-foreground line-through decoration-border",
+                            )}
+                          >
+                            {it.name}
+                            {it.quantity != null && (
+                              <span className="ml-2 font-mono text-sm font-normal text-muted-foreground">
+                                × {qtyText(it.quantity, it.unit)}
+                              </span>
+                            )}
+                          </span>
+                          {it.note && <span className="block text-sm text-muted-foreground break-words">{it.note}</span>}
+                        </span>
+                      </button>
+                      {it.status === "MISSING" && (
+                        <label className="-mt-1 flex flex-wrap items-center gap-2 pb-2.5 pl-[56px] text-sm text-danger">
+                          <span>{t("Short by")}</span>
+                          <QtyInput
+                            value={it.missingQty}
+                            onChange={(missingQty) => patchItem(it.id, { missingQty })}
+                            onSave={(missingQty) => persist(actions.setMissingQty(it.id, missingQty))}
+                            aria-label={t("How many {name} are missing", { name: it.name })}
+                            className="w-20 border-danger/50 text-danger"
+                          />
+                          {it.unit && <span>{it.unit}</span>}
+                          {it.quantity != null && (
+                            <span className="text-muted-foreground">
+                              {t("of {n} needed", { n: qtyText(it.quantity, it.unit) })}
+                            </span>
+                          )}
+                        </label>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </section>
         );
       })}
@@ -259,7 +340,7 @@ function ShoppingList({ missing }: { missing: ReturnType<typeof summarize>["miss
   const { t } = useI18n();
   const [copied, setCopied] = useState<string | null>(null);
   async function copy() {
-    const text = `${t("Need to get")}\n${missing.map((m) => `- ${m.name}`).join("\n")}`;
+    const text = `${t("Need to get")}\n${missing.map((m) => `- ${m.name}${m.short ? `: ${m.short}` : ""}`).join("\n")}`;
     try {
       await navigator.clipboard.writeText(text);
       setCopied(t("Copied"));
@@ -274,7 +355,8 @@ function ShoppingList({ missing }: { missing: ReturnType<typeof summarize>["miss
       <ul className="grid list-disc gap-0.5 pl-5">
         {missing.map((m, i) => (
           <li key={i}>
-            {m.name}{" "}
+            {m.name}
+            {m.short && <span className="font-semibold text-danger"> — {t("short {n}", { n: m.short })}</span>}{" "}
             <span className="font-mono text-xs text-muted-foreground">
               {step(m.step - 1)} {m.section}
             </span>
@@ -340,7 +422,7 @@ function ManageView({ sections, setSections, persist, fail }: ViewProps) {
     setSections((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   }
 
-  function patchItem(id: number, patch: { name?: string; note?: string }) {
+  function patchItem(id: number, patch: Partial<ChecklistItem>) {
     setSections((prev) =>
       prev.map((s) => ({ ...s, items: s.items.map((i) => (i.id === id ? { ...i, ...patch } : i)) })),
     );
@@ -351,7 +433,7 @@ function ManageView({ sections, setSections, persist, fail }: ViewProps) {
     const title = t("New section");
     try {
       const id = await actions.addSection(title);
-      setSections((prev) => [...prev, { id, title, description: "", items: [] }]);
+      setSections((prev) => [...prev, { id, title, description: "", collapsed: false, items: [] }]);
       focusNext.current = `section-title-${id}`;
     } catch {
       fail();
@@ -436,6 +518,24 @@ function ManageView({ sections, setSections, persist, fail }: ViewProps) {
                       onChange={(note) => patchItem(it.id, { note })}
                       onSave={(note) => persist(actions.updateItem(it.id, { note }))}
                     />
+                    <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-1.5">
+                      <QtyInput
+                        value={it.quantity}
+                        placeholder={t("Qty")}
+                        aria-label={t("How many {name} are needed", { name: it.name })}
+                        className="bg-card text-sm"
+                        onChange={(quantity) => patchItem(it.id, { quantity })}
+                        onSave={(quantity) => persist(actions.updateItem(it.id, { quantity }))}
+                      />
+                      <AutoInput
+                        className="text-sm"
+                        value={it.unit}
+                        placeholder={t("Unit, e.g. bottles, g")}
+                        aria-label={t("Unit for {name}", { name: it.name })}
+                        onChange={(unit) => patchItem(it.id, { unit })}
+                        onSave={(unit) => persist(actions.updateItem(it.id, { unit }))}
+                      />
+                    </div>
                   </div>
                   <div className="flex flex-wrap justify-end gap-1">
                     <IconButton
@@ -509,12 +609,14 @@ function AddItem({
 }: {
   sectionId: number;
   sectionTitle: string;
-  onAdded: (item: ChecklistSection["items"][number]) => void;
+  onAdded: (item: ChecklistItem) => void;
   onError: () => void;
 }) {
   const { t } = useI18n();
   const [name, setName] = useState("");
   const [note, setNote] = useState("");
+  const [quantity, setQuantity] = useState("");
+  const [unit, setUnit] = useState("");
   const [pending, setPending] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
 
@@ -523,10 +625,13 @@ function AddItem({
     if (!n) return nameRef.current?.focus();
     setPending(true);
     try {
-      const id = await actions.addItem(sectionId, n, note);
-      onAdded({ id, name: n, note: note.trim(), status: "TODO" });
+      const item = { name: n, note: note.trim(), quantity: parseQty(quantity), unit: unit.trim() };
+      const id = await actions.addItem(sectionId, item);
+      onAdded({ id, ...item, status: "TODO", missingQty: null });
       setName("");
       setNote("");
+      setQuantity("");
+      setUnit("");
     } catch {
       onError();
     }
@@ -563,6 +668,27 @@ function AddItem({
           autoComplete="off"
           className="bg-background text-sm"
         />
+        <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-1.5">
+          <Input
+            value={quantity}
+            onChange={(e) => setQuantity(e.target.value)}
+            onKeyDown={onKeyDown}
+            inputMode="decimal"
+            placeholder={t("Qty")}
+            aria-label={t("How many are needed")}
+            autoComplete="off"
+            className="bg-background text-sm"
+          />
+          <Input
+            value={unit}
+            onChange={(e) => setUnit(e.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder={t("Unit, e.g. bottles, g")}
+            aria-label={t("Unit for the new equipment")}
+            autoComplete="off"
+            className="bg-background text-sm"
+          />
+        </div>
       </div>
       <Button onClick={add} disabled={pending}>
         {t("Add")}
@@ -700,6 +826,37 @@ function AutoInput({
         timer.current = setTimeout(flush, 600);
       }}
       onBlur={flush}
+    />
+  );
+}
+
+/**
+ * Amount field: keeps what is typed (so "1." or "" survive), reports the parsed number at once and
+ * saves it after a pause in typing or on leaving the field.
+ */
+function QtyInput({
+  value,
+  onChange,
+  onSave,
+  className,
+  ...props
+}: Omit<React.ComponentProps<"input">, "value" | "onChange"> & {
+  value: number | null;
+  onChange: (value: number | null) => void;
+  onSave: (value: number | null) => void;
+}) {
+  const [text, setText] = useState(value == null ? "" : fmtQty(value));
+  return (
+    <AutoInput
+      {...props}
+      value={text}
+      inputMode="decimal"
+      className={cn("tabular-nums", className)}
+      onChange={(v) => {
+        setText(v);
+        onChange(parseQty(v));
+      }}
+      onSave={(v) => onSave(parseQty(v))}
     />
   );
 }

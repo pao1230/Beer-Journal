@@ -356,17 +356,21 @@ model ChecklistSection {
   title       String
   description String?
   sortOrder   Int             @default(0)
+  collapsed   Boolean         @default(false) // folded away on the check tab
   items       ChecklistItem[]
 }
 
 model ChecklistItem {
-  id        Int              @id @default(autoincrement())
-  sectionId Int
-  section   ChecklistSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
-  name      String
-  note      String?
-  sortOrder Int              @default(0)
-  status    ChecklistStatus  @default(TODO)
+  id         Int              @id @default(autoincrement())
+  sectionId  Int
+  section    ChecklistSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  name       String
+  note       String?
+  quantity   Float? // how many are needed, in `unit`
+  unit       String?
+  sortOrder  Int              @default(0)
+  status     ChecklistStatus  @default(TODO)
+  missingQty Float? // how many are short while status is MISSING
 
   @@index([sectionId])
 }
