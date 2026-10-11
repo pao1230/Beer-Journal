@@ -5,23 +5,78 @@ import { UserError } from "@/lib/user-error";
 export const STATUSES = ["TODO", "OK", "MISSING", "SKIP"] as const;
 export type ChecklistStatus = (typeof STATUSES)[number];
 
-export type ChecklistItem = { id: number; name: string; note: string; status: ChecklistStatus };
+export type ChecklistItem = {
+  id: number;
+  name: string;
+  note: string;
+  /** How many are needed, in `unit`; null when it's just "have one". */
+  quantity: number | null;
+  unit: string;
+  status: ChecklistStatus;
+  /** How many are short; only kept while the status is MISSING. */
+  missingQty: number | null;
+};
 export type ChecklistSection = { id: number; title: string; description: string; items: ChecklistItem[] };
 
+type ItemDraft = { name: string; note: string; quantity: number | null; unit: string };
 /** A section before it has ids: the default list, an import, or an export. */
-export type SectionDraft = { title: string; description: string; items: { name: string; note: string }[] };
+export type SectionDraft = { title: string; description: string; items: ItemDraft[] };
 
 export function nextStatus(status: ChecklistStatus): ChecklistStatus {
   return STATUSES[(STATUSES.indexOf(status) + 1) % STATUSES.length];
 }
 
+/**
+ * The item after a tap: the next status, and when that is "missing", the whole amount needed as
+ * a starting guess for how many are short.
+ */
+export function cycle(item: ChecklistItem): ChecklistItem {
+  const status = nextStatus(item.status);
+  return { ...item, status, missingQty: status === "MISSING" ? item.quantity : null };
+}
+
+/** A section's toggle: ticks what's left as "have it", or once nothing is left, clears every tick. */
+export function sectionToggle(section: ChecklistSection): "check" | "clear" {
+  return section.items.some((i) => i.status === "TODO") ? "check" : "clear";
+}
+
+export function applySectionToggle(section: ChecklistSection, mode: "check" | "clear"): ChecklistSection {
+  return {
+    ...section,
+    items: section.items.map((i) =>
+      mode === "clear"
+        ? { ...i, status: "TODO", missingQty: null }
+        : i.status === "TODO"
+          ? { ...i, status: "OK" }
+          : i,
+    ),
+  };
+}
+
+/** "2", "0.5", "1.25": amounts without trailing zeros. */
+export function fmtQty(n: number) {
+  return String(Math.round(n * 100) / 100);
+}
+
+/** "2 bottles", "500 g", "3" or "" — the unit only shows with a number. */
+export function qtyText(n: number | null, unit: string) {
+  return n == null ? "" : [fmtQty(n), unit].filter(Boolean).join(" ");
+}
+
+/** Reads a typed amount; blank (or nonsense) is null, negatives are not allowed. */
+export function parseQty(text: string): number | null {
+  const n = Number(text.trim().replace(",", "."));
+  return text.trim() === "" || !Number.isFinite(n) || n < 0 ? null : n;
+}
+
 export function summarize(sections: ChecklistSection[]) {
   const counts = { OK: 0, MISSING: 0, SKIP: 0, TODO: 0 };
-  const missing: { name: string; step: number; section: string }[] = [];
+  const missing: { name: string; short: string; step: number; section: string }[] = [];
   sections.forEach((sec, i) => {
     for (const it of sec.items) {
       counts[it.status]++;
-      if (it.status === "MISSING") missing.push({ name: it.name, step: i + 1, section: sec.title });
+      if (it.status === "MISSING")
+        missing.push({ name: it.name, short: qtyText(it.missingQty, it.unit), step: i + 1, section: sec.title });
     }
   });
   const total = counts.OK + counts.MISSING + counts.SKIP + counts.TODO;
@@ -67,7 +122,12 @@ export function exportChecklist(sections: ChecklistSection[]) {
       sections: sections.map((s) => ({
         title: s.title,
         desc: s.description,
-        items: s.items.map((i) => ({ name: i.name, note: i.note })),
+        items: s.items.map((i) => ({
+          name: i.name,
+          note: i.note,
+          ...(i.quantity != null && { quantity: i.quantity }),
+          ...(i.unit && { unit: i.unit }),
+        })),
       })),
     },
     null,
@@ -81,7 +141,14 @@ const fileSchema = z.object({
       title: z.string(),
       desc: z.string().optional(),
       description: z.string().optional(),
-      items: z.array(z.object({ name: z.string(), note: z.string().optional() })),
+      items: z.array(
+        z.object({
+          name: z.string(),
+          note: z.string().optional(),
+          quantity: z.number().nonnegative().nullable().optional(),
+          unit: z.string().optional(),
+        }),
+      ),
     }),
   ),
 });
@@ -99,7 +166,7 @@ export function parseChecklist(text: string): SectionDraft[] {
     parsed.data.sections.map((s) => ({
       title: s.title,
       description: s.description ?? s.desc ?? "",
-      items: s.items.map((i) => ({ name: i.name, note: i.note ?? "" })),
+      items: s.items.map((i) => ({ name: i.name, note: i.note ?? "", quantity: i.quantity ?? null, unit: i.unit ?? "" })),
     })),
   );
 }
@@ -109,14 +176,16 @@ export function cleanDrafts(drafts: SectionDraft[]): SectionDraft[] {
   return drafts.map((s) => ({
     title: s.title.trim(),
     description: s.description.trim(),
-    items: s.items.map((i) => ({ name: i.name.trim(), note: i.note.trim() })).filter((i) => i.name),
+    items: s.items
+      .map((i) => ({ ...i, name: i.name.trim(), note: i.note.trim(), unit: i.unit.trim() }))
+      .filter((i) => i.name),
   }));
 }
 
 const d = (title: string, description: string, items: [string, string?][]): SectionDraft => ({
   title,
   description,
-  items: items.map(([name, note = ""]) => ({ name, note })),
+  items: items.map(([name, note = ""]) => ({ name, note, quantity: null, unit: "" })),
 });
 
 /** Starter list: all-grain brew day through kegging. */

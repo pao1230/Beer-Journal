@@ -55,7 +55,9 @@ batch learns from the last one. See [PLAN.md](PLAN.md) for the full product plan
   buttons; shown on the recipe, the brew's fermentation step and the printed sheet
 - **Brew-day equipment checklist** — ten steps from sanitising to kegging; tap an item to cycle
   have it ✓ / missing ! / not used –, with a sticky progress bar, a "get these first" list you can
-  copy, and "start a new batch" to clear the ticks. A second tab adds, edits, deletes and reorders
+  copy, and "start a new batch" to clear the ticks. Items can carry an amount needed (e.g. 3
+  bottles); a missing one asks how many are short and the shopping list shows it. Each section's
+  "all here" button turns into "uncheck all" once everything in it is ticked. A second tab adds, edits, deletes and reorders
   sections and items (moving an item past its section's edge moves it to the next section), and
   backs up or imports the list as JSON
 - **Thai / English UI** — ไทย/EN switch in the top bar (remembered in a cookie; first visit follows
