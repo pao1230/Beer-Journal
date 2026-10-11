@@ -342,3 +342,31 @@ model Photo {
 
   @@index([brewStepId])
 }
+
+enum ChecklistStatus {
+  TODO
+  OK
+  MISSING
+  SKIP
+}
+
+/// Brew-day equipment checklist: ordered sections of items, each with the current batch's status.
+model ChecklistSection {
+  id          Int             @id @default(autoincrement())
+  title       String
+  description String?
+  sortOrder   Int             @default(0)
+  items       ChecklistItem[]
+}
+
+model ChecklistItem {
+  id        Int              @id @default(autoincrement())
+  sectionId Int
+  section   ChecklistSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  name      String
+  note      String?
+  sortOrder Int              @default(0)
+  status    ChecklistStatus  @default(TODO)
+
+  @@index([sectionId])
+}

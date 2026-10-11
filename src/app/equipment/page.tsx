@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ListChecks } from "lucide-react";
 import { ButtonLink, Card, Empty, PageHeader } from "@/components/ui";
 import { db } from "@/lib/db";
 import { getI18n } from "@/lib/i18n/server";
@@ -19,7 +20,15 @@ export default async function EquipmentPage() {
       <PageHeader
         title={t("Equipment profiles")}
         subtitle={t("Boil-off, losses and efficiency for your brew rig. Recipes use this to estimate volumes.")}
-        actions={<ButtonLink href="/equipment/new">{t("+ New profile")}</ButtonLink>}
+        actions={
+          <>
+            <ButtonLink href="/equipment/checklist" variant="secondary">
+              <ListChecks className="size-4" />
+              {t("Brew-day checklist")}
+            </ButtonLink>
+            <ButtonLink href="/equipment/new">{t("+ New profile")}</ButtonLink>
+          </>
+        }
       />
       {profiles.length === 0 ? (
         <Card>

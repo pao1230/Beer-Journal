@@ -1,46 +1,57 @@
 @import "tailwindcss";
 
 :root {
-  --background: #fafaf9;
-  --foreground: #1c1917;
-  --card: #ffffff;
-  --muted: #f5f5f4;
-  --muted-foreground: #78716c;
-  --border: #e7e5e4;
-  --primary: #b45309;
-  --primary-foreground: #ffffff;
-  --danger: #b91c1c;
-  --warning-bg: #fffbeb;
-  --warning-border: #fcd34d;
+  --background: #edf0ee;
+  --foreground: #18211e;
+  --card: #f8faf9;
+  --muted: #e1e5e3;
+  --muted-foreground: #5a6762;
+  --border: #cfd6d2;
+  --primary: #2b5a6b;
+  --primary-foreground: #f8faf9;
+  --danger: #b4361f;
+  --danger-bg: #f6dcd5;
+  --ok: #2f7d4a;
+  --ok-bg: #dcefe2;
+  --skip: #66716d;
+  --skip-bg: #e1e5e3;
+  --warning-bg: #f6eed8;
+  --warning-border: #d6b25e;
   --series-1: #2a78d6;
   --series-2: #eb6834;
   --series-3: #1baf7a;
   --series-4: #eda100;
-  --chart-grid: #ecebe7;
-  --chart-axis: #c3c2b7;
-  --chart-ink-muted: #78716c;
+  --chart-grid: #dce2df;
+  --chart-axis: #b3bdb8;
+  --chart-ink-muted: #5a6762;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0c0a09;
-    --foreground: #f5f5f4;
-    --card: #1c1917;
-    --muted: #292524;
-    --muted-foreground: #a8a29e;
-    --border: #44403c;
-    --primary: #f59e0b;
-    --primary-foreground: #1c1917;
-    --danger: #f87171;
-    --warning-bg: #2a1f06;
-    --warning-border: #92400e;
+    --background: #121a18;
+    --foreground: #e4ebe8;
+    --card: #1a2421;
+    --muted: #26312d;
+    --muted-foreground: #93a39d;
+    --border: #2d3a36;
+    --primary: #7fb7c9;
+    --primary-foreground: #121a18;
+    --danger: #ff8a72;
+    --danger-bg: #432019;
+    --ok: #6fcf8e;
+    --ok-bg: #1f3a2a;
+    --skip: #8d9a95;
+    --skip-bg: #26312d;
+    --warning-bg: #2c2615;
+    --warning-border: #7a6526;
     --series-1: #3987e5;
     --series-2: #d95926;
     --series-3: #199e70;
     --series-4: #c98500;
-    --chart-grid: #2c2a28;
-    --chart-axis: #44403c;
-    --chart-ink-muted: #a8a29e;
+    --chart-grid: #26312d;
+    --chart-axis: #3a4843;
+    --chart-ink-muted: #93a39d;
+    color-scheme: dark;
   }
 }
 
@@ -54,14 +65,30 @@
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-danger: var(--danger);
+  --color-danger-bg: var(--danger-bg);
+  --color-ok: var(--ok);
+  --color-ok-bg: var(--ok-bg);
+  --color-skip: var(--skip);
+  --color-skip-bg: var(--skip-bg);
   --color-warning-bg: var(--warning-bg);
   --color-warning-border: var(--warning-border);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Thai", sans-serif;
+  --font-sans: var(--font-plex-thai), system-ui, -apple-system, "Segoe UI", "Noto Sans Thai", sans-serif;
+  --font-display: var(--font-prompt), var(--font-plex-thai), system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, Menlo, Consolas, monospace;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
+}
+
+@layer base {
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    text-wrap: balance;
+  }
 }
 
 /*
