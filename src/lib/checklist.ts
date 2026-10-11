@@ -16,7 +16,14 @@ export type ChecklistItem = {
   /** How many are short; only kept while the status is MISSING. */
   missingQty: number | null;
 };
-export type ChecklistSection = { id: number; title: string; description: string; items: ChecklistItem[] };
+export type ChecklistSection = {
+  id: number;
+  title: string;
+  description: string;
+  /** Folded away on the check tab. */
+  collapsed: boolean;
+  items: ChecklistItem[];
+};
 
 type ItemDraft = { name: string; note: string; quantity: number | null; unit: string };
 /** A section before it has ids: the default list, an import, or an export. */

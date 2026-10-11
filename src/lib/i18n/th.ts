@@ -800,6 +800,8 @@ export const th: Record<string, string> = {
   "Not used this batch": "ไม่ใช้ใน batch นี้",
   "(untitled)": "(ไม่มีชื่อ)",
   "All here": "ครบทั้งหมด",
+  "Expand all": "ขยายทุกหมวด",
+  "Collapse all": "ย่อทุกหมวด",
   "Uncheck all": "ยกเลิกทั้งหมด",
   "No items in this section yet. Add them under Manage list.": "หมวดนี้ยังไม่มีรายการ เพิ่มได้ในหน้าจัดการรายการ",
   "{name}, status: {status}": "{name} สถานะ {status}",

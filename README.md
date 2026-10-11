@@ -57,7 +57,9 @@ batch learns from the last one. See [PLAN.md](PLAN.md) for the full product plan
   have it ✓ / missing ! / not used –, with a sticky progress bar, a "get these first" list you can
   copy, and "start a new batch" to clear the ticks. Items can carry an amount needed (e.g. 3
   bottles); a missing one asks how many are short and the shopping list shows it. Each section's
-  "all here" button turns into "uncheck all" once everything in it is ticked. A second tab adds, edits, deletes and reorders
+  "all here" button turns into "uncheck all" once everything in it is ticked. Sections fold away
+  with a tap on their heading (or all at once), remembered across devices; a folded section still
+  shows how many of its items are missing. A second tab adds, edits, deletes and reorders
   sections and items (moving an item past its section's edge moves it to the next section), and
   backs up or imports the list as JSON
 - **Thai / English UI** — ไทย/EN switch in the top bar (remembered in a cookie; first visit follows

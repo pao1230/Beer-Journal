@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, ChevronsDownUp, ChevronsUpDown, Plus, X } from "lucide-react";
 import { Button, Card, Input, Textarea } from "@/components/ui";
 import { useI18n } from "@/lib/i18n/client";
 import {
@@ -128,6 +128,16 @@ function CheckView({ sections, setSections, persist, fail, onManage }: ViewProps
     persist(actions.toggleSection(section.id, mode));
   }
 
+  function collapse(sectionId: number, collapsed: boolean) {
+    setSections((prev) => prev.map((s) => (s.id === sectionId ? { ...s, collapsed } : s)));
+    persist(actions.setSectionCollapsed(sectionId, collapsed));
+  }
+
+  function collapseAll(collapsed: boolean) {
+    setSections((prev) => prev.map((s) => ({ ...s, collapsed })));
+    persist(actions.setAllCollapsed(collapsed));
+  }
+
   function reset() {
     setSections((prev) =>
       prev.map((s) => ({ ...s, items: s.items.map((i) => ({ ...i, status: "TODO", missingQty: null })) })),
@@ -187,14 +197,50 @@ function CheckView({ sections, setSections, persist, fail, onManage }: ViewProps
 
       {sum.missing.length > 0 && <ShoppingList missing={sum.missing} />}
 
+      <div className="mt-5 flex justify-end">
+        {sections.some((s) => s.collapsed) ? (
+          <Button variant="ghost" onClick={() => collapseAll(false)}>
+            <ChevronsUpDown className="size-4" />
+            {t("Expand all")}
+          </Button>
+        ) : (
+          <Button variant="ghost" onClick={() => collapseAll(true)}>
+            <ChevronsDownUp className="size-4" />
+            {t("Collapse all")}
+          </Button>
+        )}
+      </div>
+
       {sections.map((sec, si) => {
         const done = sec.items.filter((i) => i.status !== "TODO").length;
+        const missing = sec.items.filter((i) => i.status === "MISSING").length;
+        const bodyId = `section-body-${sec.id}`;
         return (
-          <section key={sec.id} className="mt-7">
-            <div className="flex flex-wrap items-baseline gap-3 border-b-2 border-foreground pb-2">
-              <span className="font-mono text-sm text-muted-foreground">{step(si)}</span>
-              <h2 className="min-w-0 flex-[1_1_12ch] text-xl font-semibold break-words">{sec.title || t("(untitled)")}</h2>
+          <section key={sec.id} className="mt-5">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b-2 border-foreground pb-2">
+              <button
+                type="button"
+                aria-expanded={!sec.collapsed}
+                aria-controls={bodyId}
+                onClick={() => collapse(sec.id, !sec.collapsed)}
+                className="-ml-1 flex min-h-10 min-w-0 flex-[1_1_15rem] items-baseline gap-3 rounded-md px-1 text-left hover:bg-card"
+              >
+                <ChevronDown
+                  aria-hidden
+                  className={cn(
+                    "size-5 shrink-0 self-center text-muted-foreground transition-transform motion-reduce:transition-none",
+                    sec.collapsed && "-rotate-90",
+                  )}
+                />
+                <span className="shrink-0 font-mono text-sm text-muted-foreground">{step(si)}</span>
+                <h2 className="min-w-0 text-xl font-semibold break-words">{sec.title || t("(untitled)")}</h2>
+              </button>
               <div className="ml-auto flex items-center gap-2.5">
+                {sec.collapsed && missing > 0 && (
+                  <Chip status="MISSING">
+                    <span className="font-mono text-xs">{t("Missing {n}", { n: missing })}</span>
+                  </Chip>
+                )}
                 <span className="font-mono text-sm text-muted-foreground tabular-nums">
                   {done}/{sec.items.length}
                 </span>
@@ -205,69 +251,71 @@ function CheckView({ sections, setSections, persist, fail, onManage }: ViewProps
                 )}
               </div>
             </div>
-            {sec.description && <p className="mt-2 text-sm text-muted-foreground break-words">{sec.description}</p>}
-            {sec.items.length === 0 ? (
-              <p className="mt-2.5 rounded-lg border border-dashed border-border p-3 text-sm text-muted-foreground">
-                {t("No items in this section yet. Add them under Manage list.")}
-              </p>
-            ) : (
-              <ul className="mt-2">
-                {sec.items.map((it) => (
-                  <li key={it.id} className="border-b border-border">
-                    <button
-                      type="button"
-                      onClick={() => tap(it)}
-                      aria-label={t("{name}, status: {status}", { name: it.name, status: t(LABEL[it.status]) })}
-                      className="grid min-h-13 w-full grid-cols-[40px_1fr] items-start gap-3 px-1 py-2.5 text-left hover:bg-card"
-                    >
-                      <span
-                        aria-hidden
-                        className={cn(
-                          "grid size-9 place-items-center rounded-lg border-2 font-mono text-lg font-semibold",
-                          BOX[it.status],
-                        )}
+            <div id={bodyId} hidden={sec.collapsed}>
+              {sec.description && <p className="mt-2 text-sm text-muted-foreground break-words">{sec.description}</p>}
+              {sec.items.length === 0 ? (
+                <p className="mt-2.5 rounded-lg border border-dashed border-border p-3 text-sm text-muted-foreground">
+                  {t("No items in this section yet. Add them under Manage list.")}
+                </p>
+              ) : (
+                <ul className="mt-2">
+                  {sec.items.map((it) => (
+                    <li key={it.id} className="border-b border-border">
+                      <button
+                        type="button"
+                        onClick={() => tap(it)}
+                        aria-label={t("{name}, status: {status}", { name: it.name, status: t(LABEL[it.status]) })}
+                        className="grid min-h-13 w-full grid-cols-[40px_1fr] items-start gap-3 px-1 py-2.5 text-left hover:bg-card"
                       >
-                        {GLYPH[it.status]}
-                      </span>
-                      <span className="min-w-0">
                         <span
+                          aria-hidden
                           className={cn(
-                            "block font-medium break-words",
-                            it.status === "SKIP" && "text-muted-foreground line-through decoration-border",
+                            "grid size-9 place-items-center rounded-lg border-2 font-mono text-lg font-semibold",
+                            BOX[it.status],
                           )}
                         >
-                          {it.name}
+                          {GLYPH[it.status]}
+                        </span>
+                        <span className="min-w-0">
+                          <span
+                            className={cn(
+                              "block font-medium break-words",
+                              it.status === "SKIP" && "text-muted-foreground line-through decoration-border",
+                            )}
+                          >
+                            {it.name}
+                            {it.quantity != null && (
+                              <span className="ml-2 font-mono text-sm font-normal text-muted-foreground">
+                                × {qtyText(it.quantity, it.unit)}
+                              </span>
+                            )}
+                          </span>
+                          {it.note && <span className="block text-sm text-muted-foreground break-words">{it.note}</span>}
+                        </span>
+                      </button>
+                      {it.status === "MISSING" && (
+                        <label className="-mt-1 flex flex-wrap items-center gap-2 pb-2.5 pl-[56px] text-sm text-danger">
+                          <span>{t("Short by")}</span>
+                          <QtyInput
+                            value={it.missingQty}
+                            onChange={(missingQty) => patchItem(it.id, { missingQty })}
+                            onSave={(missingQty) => persist(actions.setMissingQty(it.id, missingQty))}
+                            aria-label={t("How many {name} are missing", { name: it.name })}
+                            className="w-20 border-danger/50 text-danger"
+                          />
+                          {it.unit && <span>{it.unit}</span>}
                           {it.quantity != null && (
-                            <span className="ml-2 font-mono text-sm font-normal text-muted-foreground">
-                              × {qtyText(it.quantity, it.unit)}
+                            <span className="text-muted-foreground">
+                              {t("of {n} needed", { n: qtyText(it.quantity, it.unit) })}
                             </span>
                           )}
-                        </span>
-                        {it.note && <span className="block text-sm text-muted-foreground break-words">{it.note}</span>}
-                      </span>
-                    </button>
-                    {it.status === "MISSING" && (
-                      <label className="-mt-1 flex flex-wrap items-center gap-2 pb-2.5 pl-[56px] text-sm text-danger">
-                        <span>{t("Short by")}</span>
-                        <QtyInput
-                          value={it.missingQty}
-                          onChange={(missingQty) => patchItem(it.id, { missingQty })}
-                          onSave={(missingQty) => persist(actions.setMissingQty(it.id, missingQty))}
-                          aria-label={t("How many {name} are missing", { name: it.name })}
-                          className="w-20 border-danger/50 text-danger"
-                        />
-                        {it.unit && <span>{it.unit}</span>}
-                        {it.quantity != null && (
-                          <span className="text-muted-foreground">
-                            {t("of {n} needed", { n: qtyText(it.quantity, it.unit) })}
-                          </span>
-                        )}
-                      </label>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
+                        </label>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </section>
         );
       })}
@@ -385,7 +433,7 @@ function ManageView({ sections, setSections, persist, fail }: ViewProps) {
     const title = t("New section");
     try {
       const id = await actions.addSection(title);
-      setSections((prev) => [...prev, { id, title, description: "", items: [] }]);
+      setSections((prev) => [...prev, { id, title, description: "", collapsed: false, items: [] }]);
       focusNext.current = `section-title-${id}`;
     } catch {
       fail();

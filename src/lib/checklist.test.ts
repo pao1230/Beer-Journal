@@ -32,13 +32,14 @@ const list = (): ChecklistSection[] => [
     id: 1,
     title: "Clean",
     description: "",
+    collapsed: false,
     items: [
       item(11, "PBW", { status: "OK" }),
       item(12, "Star San", { note: "dilute", quantity: 3, unit: "bottles", status: "MISSING", missingQty: 2 }),
     ],
   },
-  { id: 2, title: "Empty", description: "", items: [] },
-  { id: 3, title: "Boil", description: "60 min", items: [item(31, "Kettle")] },
+  { id: 2, title: "Empty", description: "", collapsed: false, items: [] },
+  { id: 3, title: "Boil", description: "60 min", collapsed: true, items: [item(31, "Kettle")] },
 ];
 
 const ids = (sections: ChecklistSection[] | null) => sections?.map((s) => [s.id, s.items.map((i) => i.id)]);

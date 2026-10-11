@@ -356,6 +356,7 @@ model ChecklistSection {
   title       String
   description String?
   sortOrder   Int             @default(0)
+  collapsed   Boolean         @default(false) // folded away on the check tab
   items       ChecklistItem[]
 }
 

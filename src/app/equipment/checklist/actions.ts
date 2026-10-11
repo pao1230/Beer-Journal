@@ -37,6 +37,7 @@ export async function loadChecklist(): Promise<ChecklistSection[]> {
     id: s.id,
     title: s.title,
     description: s.description ?? "",
+    collapsed: s.collapsed,
     items: s.items.map((i) => ({
       id: i.id,
       name: i.name,
@@ -92,6 +93,14 @@ export async function updateSection(sectionId: number, data: { title?: string; d
       ...(data.description !== undefined && { description: text(data.description) || null }),
     },
   });
+}
+
+export async function setSectionCollapsed(sectionId: number, collapsed: boolean) {
+  await db.checklistSection.update({ where: { id: id(sectionId) }, data: { collapsed: collapsed === true } });
+}
+
+export async function setAllCollapsed(collapsed: boolean) {
+  await db.checklistSection.updateMany({ data: { collapsed: collapsed === true } });
 }
 
 export async function deleteSection(sectionId: number) {
