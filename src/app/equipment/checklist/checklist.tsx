@@ -233,7 +233,7 @@ function CheckView({ sections, setSections, persist, fail, onManage }: ViewProps
                   )}
                 />
                 <span className="shrink-0 font-mono text-sm text-muted-foreground">{step(si)}</span>
-                <h2 className="min-w-0 text-xl font-semibold break-words">{sec.title || t("(untitled)")}</h2>
+                <h2 className="min-w-0 text-xl font-semibold break-words text-primary">{sec.title || t("(untitled)")}</h2>
               </button>
               <div className="ml-auto flex items-center gap-2.5">
                 {sec.collapsed && missing > 0 && (
