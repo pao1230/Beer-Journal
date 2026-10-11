@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Recipes, brew sessions, problems and lessons learned.",
     start_url: "/",
     display: "standalone",
-    background_color: "#fafaf9",
-    theme_color: "#b45309",
+    background_color: "#edf0ee",
+    theme_color: "#2b5a6b",
     icons: [{ src: "/icon.svg", sizes: "any", type: "image/svg+xml" }],
   };
 }

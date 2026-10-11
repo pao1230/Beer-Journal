@@ -10,6 +10,7 @@ import {
   Home,
   LayoutDashboard,
   Lightbulb,
+  ListChecks,
   Menu,
   Package,
   Plus,
@@ -30,6 +31,7 @@ const pages = [
   { href: "/compare", label: "Compare", icon: GitCompare },
   { href: "/lessons", label: "Lessons", icon: Lightbulb },
   { href: "/equipment", label: "Equipment", icon: Wrench },
+  { href: "/equipment/checklist", label: "Checklist", icon: ListChecks },
 ];
 
 const mobile = [
@@ -43,6 +45,7 @@ const mobile = [
 function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
   if (href === "/brews") return pathname.startsWith("/brews") && pathname !== "/brews/new";
+  if (href === "/equipment") return pathname.startsWith("/equipment") && !pathname.startsWith("/equipment/checklist");
   return pathname.startsWith(href);
 }
 
@@ -98,7 +101,7 @@ export function TopNav() {
     <>
       <header className="sticky top-0 z-30 border-b border-border bg-card/95 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-5xl items-center gap-2 px-4 sm:gap-4">
-          <Link href="/" className="min-w-0 truncate font-bold whitespace-nowrap">
+          <Link href="/" className="min-w-0 truncate font-display font-bold whitespace-nowrap">
             🍺 {t("Brewing Journal")}
           </Link>
           <nav className="hidden gap-0.5 lg:flex">

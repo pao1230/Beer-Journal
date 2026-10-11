@@ -53,6 +53,11 @@ batch learns from the last one. See [PLAN.md](PLAN.md) for the full product plan
   Also shows what's short in stock
 - **Fermentation plan** — steps per recipe version (primary, dry hop, cold crash…) with quick-add
   buttons; shown on the recipe, the brew's fermentation step and the printed sheet
+- **Brew-day equipment checklist** — ten steps from sanitising to kegging; tap an item to cycle
+  have it ✓ / missing ! / not used –, with a sticky progress bar, a "get these first" list you can
+  copy, and "start a new batch" to clear the ticks. A second tab adds, edits, deletes and reorders
+  sections and items (moving an item past its section's edge moves it to the next section), and
+  backs up or imports the list as JSON
 - **Thai / English UI** — ไทย/EN switch in the top bar (remembered in a cookie; first visit follows
   the browser language). Dates show in the Thai calendar in Thai. Brewing abbreviations (OG, FG,
   ABV, IBU, SRM, pH) and units stay as they are

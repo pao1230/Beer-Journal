@@ -22,7 +22,7 @@ export async function BrewList({ brews }: { brews: BrewListItem[] }) {
       {brews.map((b) => (
         <li key={b.id}>
           <Link href={`/brews/${b.id}`} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-3 hover:bg-muted/50">
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-[1_1_10rem]">
               <div className="font-semibold">{batchLabel(b.recipe.name, b.batchNumber)}</div>
               <div className="text-xs text-muted-foreground">
                 {date(b.brewDate)}
